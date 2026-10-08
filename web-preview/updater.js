@@ -16,6 +16,7 @@
   var progress = { percent: -1, text: '' };
   var message = '';
   var dialogMounted = false;
+  var currentCache = '';    // 由原生事件（version 字段）带回的当前版本，避免依赖同步桥取值失败
 
   function el(id) { return document.getElementById(id); }
   function rt() { return window.AndroidHost || (window.parent && window.parent !== window ? window.parent.AndroidHost : null); }
@@ -74,11 +75,29 @@
   }
 
   function currentVersion() {
-    try { if (native()) { var r = rt().getAppVersion(); if (r) { var parsed = typeof r === 'string' ? JSON.parse(r) : r; if (parsed && parsed.version) return normalize(parsed.version); } } } catch (e) { }
+    if (currentCache) return currentCache; // 原生事件已给出当前版本，优先采信
+    try {
+      if (native()) {
+        var r = rt().getAppVersion();
+        if (r) {
+          var parsed = typeof r === 'string' ? JSON.parse(r) : r;
+          if (parsed && parsed.version) return normalize(parsed.version);
+        }
+      }
+    } catch (e) { }
+    // 回退一：界面上的构建标记（例如「Android 1.19.0 · …」）
     var tag = el('buildTag');
     var text = tag && tag.textContent ? String(tag.textContent) : '';
     var match = text.match(/(\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.]+)?)/);
-    return match ? normalize(match[1]) : '';
+    if (match) return normalize(match[1]);
+    // 回退二：页面自报的版本对象（web-preview / 桌面端由 web-bridge 注入）
+    try {
+      if (window.__VITALS && window.__VITALS.version) {
+        var v = String(window.__VITALS.version).match(/(\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.]+)?)/);
+        if (v) return normalize(v[1]);
+      }
+    } catch (e) { }
+    return '';
   }
 
   /* ==================== 状态应用 ==================== */
@@ -91,7 +110,10 @@
 
   function apply(data) {
     info = data || {};
-    if (data && data.ok === false) { fail(data.error || '检查更新失败'); return; }
+    if (data && data.ok === false) { fail(data.error || data.message || '检查更新失败'); return; }
+    // 原生侧带回的当前版本最可信，先记录下来供界面与比较使用
+    if (data && data.currentVersion) currentCache = normalize(data.currentVersion);
+    if (data && data.latestVersion) info.latestVersion = normalize(data.latestVersion);
     if (!data || data.hasUpdate === false) { phase = 'latest'; message = (data && data.message) || ''; }
     else if (!data.hasApk) { phase = 'available'; message = '最新版本未提供 APK 安装包，请前往发布页手动下载'; }
     else { phase = 'available'; message = ''; }
@@ -254,11 +276,13 @@
     var data = payload;
     if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = {}; } }
     if (!data || !data.status) return;
+    // 原生事件带回的当前版本先落地，后续比较与界面显示都不再依赖同步桥
+    if (data.currentVersion) currentCache = normalize(data.currentVersion);
     switch (data.status) {
       case 'checking':
         busy = true; setPhase('checking'); break;
       case 'checked':
-        busy = false; apply(data); if (data.hasUpdate && data.hasApk) showDialog(); else if (data.hasUpdate) toast('发现新版本 ' + normalize(data.latestVersion) + '，但未提供安装包'); else if (data.message) toast(data.message); else toast('当前已是最新版本'); break;
+        busy = false; apply(data); if (data.hasUpdate && data.hasApk) showDialog(); else if (data.hasUpdate) toast('发现新版本 ' + normalize(data.latestVersion) + '，但未提供安装包'); else if (data.message) toast(data.message); else toast('当前已是最新版本 ' + (currentCache || currentVersion())); break;
       case 'downloading':
         busy = true; setPhase('downloading'); if (Number(data.total) > 0) { progress = { percent: 0, text: '0%' }; } render(); break;
       case 'progress':
@@ -271,6 +295,9 @@
         busy = false; phase = 'available'; message = data.message || '需要安装权限'; render(); toast(data.message || '请在系统设置中允许安装未知应用'); break;
       case 'cancelled':
         busy = false; phase = info && info.hasUpdate ? 'available' : 'idle'; message = data.message || '已取消'; render(); if (data.message) toast(data.message); break;
+      case 'diagnostic':
+        try { console.warn('[Vitals 更新] ' + (data.message || '')); } catch (e) { }
+        break;
       case 'busy':
         busy = false; toast('更新任务正在进行，请稍候'); break;
       case 'error':

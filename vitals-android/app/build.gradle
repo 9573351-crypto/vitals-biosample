@@ -7,8 +7,8 @@ android {
         applicationId 'com.vitals.android'
         minSdk 26
         targetSdk 34
-        versionCode 31
-        versionName '1.19.0'
+        versionCode 33
+        versionName '1.19.2'
         testInstrumentationRunner 'com.vitals.android.DatabaseInstrumentation'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }

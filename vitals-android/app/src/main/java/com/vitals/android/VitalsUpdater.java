@@ -30,10 +30,20 @@ final class VitalsUpdater {
     private static final String API_TAG = "https://api.github.com/repos/" + REPO + "/releases/tags/";
     private static final String ACCEPT = "application/vnd.github+json";
     private static final String USER_AGENT = "Vitals-Android-Updater";
-    private static final int CONNECT_TIMEOUT_MS = 12000;
-    private static final int READ_TIMEOUT_MS = 20000;
+    private static final int CONNECT_TIMEOUT_MS = 15000;
+    // GitHub Release 资产在国内网络下经常只有几十 KB/s，读超时过短会导致大包必然失败
+    private static final int READ_TIMEOUT_MS = 90000;
     private static final long MAX_APK_BYTES = 200L * 1024 * 1024;
-    private static final String[] ALLOWED_HOSTS = {"api.github.com", "github.com", "objects.githubusercontent.com", "codeload.github.com", "github-releases.githubusercontent.com"};
+    /**
+     * Release 资产下载的实际跳转目标会随 GitHub 基础设施变化：
+     * 曾经的 objects.githubusercontent.com，现在是 release-assets.githubusercontent.com。
+     * 两者都必须放行，否则下载会在重定向处被白名单拦下（表现为“下载失败/连接超时”）。
+     */
+    private static final String[] ALLOWED_HOSTS = {
+            "api.github.com", "github.com", "codeload.github.com",
+            "objects.githubusercontent.com", "release-assets.githubusercontent.com",
+            "github-releases.githubusercontent.com", "github-production-release-asset-2e65be.s3.amazonaws.com"
+    };
 
     private VitalsUpdater() {}
 
@@ -41,7 +51,18 @@ final class VitalsUpdater {
 
     static final class Release {
         String tag, version, notes, pageUrl, publishedAt, apkUrl, apkName, sha256;
+        /** 资产在 API 上的地址，可直接跳到签名后的 CDN 直链（重定向更少） */
+        String apiUrl;
         long apkSize;
+    }
+
+    /** 按 tag 解析出的候选下载地址：API 直链优先，其次浏览器下载地址。 */
+    static java.util.List<String> downloadCandidates(Release release) {
+        java.util.List<String> list = new java.util.ArrayList<>();
+        if (release == null) return list;
+        if (release.apiUrl != null && !release.apiUrl.isEmpty()) list.add(release.apiUrl);
+        if (release.apkUrl != null && !release.apkUrl.isEmpty() && !release.apkUrl.equals(release.apiUrl)) list.add(release.apkUrl);
+        return list;
     }
 
     interface Progress {
@@ -72,6 +93,9 @@ final class VitalsUpdater {
             throw new IOException(describe(e));
         } catch (org.json.JSONException e) {
             throw new IOException("版本信息解析失败：" + e.getMessage(), e);
+        } catch (IOException e) {
+            // 连接超时 / DNS / TLS / 被拦截等：给出可据此排查的说明
+            throw new IOException(networkMessage(e), e);
         }
     }
 
@@ -88,6 +112,8 @@ final class VitalsUpdater {
             throw new IOException("版本信息解析失败：" + e.getMessage(), e);
         } catch (HttpStatus e) {
             throw new IOException(describe(e));
+        } catch (IOException e) {
+            throw new IOException(networkMessage(e), e);
         }
     }
 
@@ -126,6 +152,8 @@ final class VitalsUpdater {
 
     /* ==================== 下载 ==================== */
 
+    private static final int DOWNLOAD_ATTEMPTS = 3;
+
     static File download(Context context, String apkUrl, long expectedSize, String expectedSha256, Progress progress) throws IOException {
         requireAllowed(apkUrl);
         if (expectedSha256 == null || expectedSha256.isEmpty()) {
@@ -135,8 +163,29 @@ final class VitalsUpdater {
         if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) throw new IOException("无法创建更新缓存目录");
         File temp = new File(dir, "vitals-update.apk.part");
         File target = new File(dir, "vitals-update.apk");
-        if (temp.exists() && !temp.delete()) throw new IOException("无法清理上次未完成的下载文件");
+        IOException last = null;
+        // GitHub 资产在部分网络下首次连接常超时，重试几次可显著提高成功率；已下载到的字节在重试时丢弃重来。
+        for (int attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt++) {
+            try {
+                return attemptDownload(apkUrl, temp, target, expectedSize, expectedSha256, progress);
+            } catch (IOException e) {
+                last = e;
+                if (e.getMessage() != null && e.getMessage().contains("已取消")) throw e; // 用户取消不重试
+                if (attempt < DOWNLOAD_ATTEMPTS) {
+                    try {
+                        Thread.sleep(1500L * attempt);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("下载已中断", interrupted);
+                    }
+                }
+            }
+        }
+        throw last == null ? new IOException("下载失败") : last;
+    }
 
+    private static File attemptDownload(String apkUrl, File temp, File target, long expectedSize, String expectedSha256, Progress progress) throws IOException {
+        if (temp.exists() && !temp.delete()) throw new IOException("无法清理上次未完成的下载文件");
         HttpURLConnection conn = open(apkUrl, "application/octet-stream", true);
         try {
             int code = conn.getResponseCode();
@@ -228,12 +277,37 @@ final class VitalsUpdater {
         return apk.getAbsolutePath();
     }
 
+    @SuppressWarnings("deprecation") // getPackageInfo(String,int) 在 API 33+ 过时，兼容 minSdk 26 时仍可用
     static String installedVersion(Context context) {
         try {
             android.content.pm.PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
             return info.versionName;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    /**
+     * 覆盖安装要求新旧 APK 使用同一签名。这里在交给系统安装器之前先比对签名，
+     * 避免系统只抛出“应用未安装”这类无法定位的失败。
+     *
+     * @return 校验通过返回 null，否则返回面向用户的说明
+     */
+    @SuppressWarnings("deprecation") // GET_SIGNATURES 在 API 28+ 标记过时，但为兼容 minSdk 26 仍用它对签名做整体比较
+    static String signatureMismatch(Context context, String apkPath) {
+        try {
+            android.content.pm.PackageManager pm = context.getPackageManager();
+            android.content.pm.PackageInfo installed = pm.getPackageInfo(context.getPackageName(), android.content.pm.PackageManager.GET_SIGNATURES);
+            android.content.pm.PackageInfo candidate = pm.getPackageArchiveInfo(apkPath, android.content.pm.PackageManager.GET_SIGNATURES);
+            if (candidate == null || candidate.signatures == null || candidate.signatures.length == 0) return null;
+            if (installed == null || installed.signatures == null || installed.signatures.length == 0) return null;
+            for (android.content.pm.Signature a : installed.signatures) {
+                for (android.content.pm.Signature b : candidate.signatures) if (a.equals(b)) return null;
+            }
+            return "更新包与本机应用的签名不一致，系统会拒绝覆盖安装。请先导出备份后卸载旧版本再安装，"
+                    + "或改用与旧版本相同签名的构建（发布方需固定签名）。";
+        } catch (Exception e) {
+            return null; // 取不到签名信息时不阻塞安装，交给系统安装器判断
         }
     }
 
@@ -311,6 +385,8 @@ final class VitalsUpdater {
     private static void fill(Release r, JSONObject asset, String name) {
         r.apkUrl = asset.optString("browser_download_url", null);
         if (r.apkUrl != null && r.apkUrl.isEmpty()) r.apkUrl = null;
+        r.apiUrl = asset.optString("url", null);
+        if (r.apiUrl != null && r.apiUrl.isEmpty()) r.apiUrl = null;
         r.apkName = name;
         r.apkSize = asset.optLong("size", 0);
         String digest = asset.optString("digest", "");
@@ -370,6 +446,18 @@ final class VitalsUpdater {
         String host = parsed.getHost() == null ? "" : parsed.getHost().toLowerCase(Locale.ROOT);
         for (String allowed : ALLOWED_HOSTS) if (host.equals(allowed)) return;
         throw new IOException("更新地址不在允许的域名内：" + host);
+    }
+
+    /** 把网络异常翻译成用户能据此判断原因的提示，避免只说一句“检查更新失败”。 */
+    private static String networkMessage(Exception e) {
+        Throwable cause = e;
+        while (cause.getCause() != null && cause.getCause() != cause) cause = cause.getCause();
+        String text = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+        if (cause instanceof java.net.SocketTimeoutException) return "连接 GitHub 超时，请检查本机网络或代理后重试";
+        if (cause instanceof java.net.UnknownHostException) return "无法解析 api.github.com，请检查网络与 DNS 设置";
+        if (cause instanceof javax.net.ssl.SSLException) return "与 GitHub 建立安全连接失败（TLS/证书）：" + text;
+        if (cause instanceof java.net.ConnectException) return "无法连接 GitHub：网络可能被拦截，请更换网络后重试";
+        return "网络请求失败：" + text;
     }
 
     private static String read(InputStream in) throws IOException {

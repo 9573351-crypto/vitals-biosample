@@ -100,7 +100,8 @@ function parseInto(parent, markup) {
   }
 }
 
-function makeEnv() {
+function makeEnv(options) {
+  const opts = options || {};
   const body = new El('body');
   const ids = {};
   const add = (id, tag) => { const node = new El(tag || 'div'); node.id = id; body.appendChild(node); ids[id] = node; return node; };
@@ -108,9 +109,17 @@ function makeEnv() {
   const sidebarFoot = add('sidebarFoot', 'div'); sidebarFoot.className = 'sidebar-foot';
   const updateGroupShell = new El('div'); updateGroupShell.className = 'migrate-group';
   const buildTag = new El('div'); buildTag.id = 'buildTag'; buildTag.className = 'build-tag';
+  if (opts.buildTag) buildTag.textContent = opts.buildTag;
   sidebarFoot.appendChild(updateGroupShell);
   sidebarFoot.appendChild(buildTag);
   ids.buildTag = buildTag;
+
+  // 可选：模拟 scripts 查询串里的构建版本（原生桥不可用时的回退来源）
+  if (opts.scriptSrc) {
+    const script = new El('script');
+    script.attributes.src = opts.scriptSrc;
+    body.appendChild(script);
+  }
 
   const viewSettings = add('view-settings', 'section'); viewSettings.className = 'view';
   const toastBox = { messages: [] };
@@ -118,7 +127,10 @@ function makeEnv() {
   const calls = [];
   const listeners = {};
   const host = {
-    getAppVersion: () => JSON.stringify({ version: '1.10.0', versionCode: 20 }),
+    // opts.version = undefined → 桥不支持 getAppVersion；null → 返回空串；字符串 → 原样返回
+    getAppVersion: opts.version === undefined
+      ? () => JSON.stringify({ version: '1.10.0', versionCode: 20 })
+      : () => (opts.version === null ? '' : JSON.stringify({ version: opts.version, versionCode: 31 })),
     checkUpdate: () => calls.push(['checkUpdate']),
     downloadUpdate: (tag, size, sha) => calls.push(['downloadUpdate', tag, size, sha]),
     installUpdate: () => calls.push(['installUpdate'])
@@ -153,6 +165,8 @@ function makeEnv() {
     Error,
     Date
   };
+  // 可选：模拟页面自报版本（web-preview / 桌面端注入的 window.__VITALS）
+  if (opts.vitalsVersion) sandbox.__VITALS = { version: opts.vitalsVersion, build: 0 };
   sandbox.window = sandbox;
   sandbox.AndroidHost = host;
   sandbox.toast = (text) => toastBox.messages.push(text);
@@ -265,6 +279,59 @@ const emit = (sandbox, payload) => sandbox.onVitalsUpdateEvent(typeof payload ==
   find(env, 'updateCheckBtn').click();
   eq('手动检查调用原生 checkUpdate', env.calls[0], ['checkUpdate']);
   eq('进入查询态', find(env, 'updatePill').textContent, '查询中');
+}
+
+/* ==================== 回归：当前版本解析失败时必须仍能正常检测 ==================== */
+/* 症状：同步桥取不到版本 → 当前版本为空 → 界面显示「未知」，且比较退化为“无更新”。 */
+
+{
+  // 桥不支持 getAppVersion，但 checking/checked 事件带回原生版本
+  const env = makeEnv({ version: undefined });
+  emit(env.sandbox, { status: 'checking', version: '1.19.0', versionCode: 31 });
+  eq('事件带回版本：查询中即显示当前版本', find(env, 'updateLine').textContent, '正在查询最新版本…');
+  emit(env.sandbox, { status: 'checked', ok: true, hasUpdate: false, latestVersion: '1.19.0', currentVersion: '1.19.0', tag: 'v1.19.0' });
+  eq('同步桥缺失时不显示未知', find(env, 'updateLine').textContent, '当前已是最新版本（1.19.0）');
+  eq('设置卡当前版本列已填充', find(env, 'updateCurrent').textContent, '1.19.0');
+}
+
+{
+  // 事件带回 1.18.2、仓库最新 1.19.0 → 必须判定为有新版本
+  const env = makeEnv({ version: undefined });
+  emit(env.sandbox, { status: 'checking', version: '1.18.2', versionCode: 30 });
+  emit(env.sandbox, { status: 'checked', ok: true, hasUpdate: true, latestVersion: '1.19.0', currentVersion: '1.18.2', tag: 'v1.19.0', apkSize: 1547599, hasApk: true });
+  eq('检测到新版本', find(env, 'updatePill').textContent, '有新版本');
+  eq('文案给出当前与最新版本', find(env, 'updateLine').textContent, '发现新版本 1.19.0，当前 1.18.2');
+  eq('设置卡最新版本列已填充', find(env, 'updateLatest').textContent, '1.19.0');
+}
+
+{
+  // 桥返回空串，构建标记里带版本（「Android 1.19.0 · …」）
+  const env = makeEnv({ version: null, buildTag: 'Android 1.19.0 · 人工出库免扫码' });
+  emit(env.sandbox, { status: 'checked', ok: true, hasUpdate: false, latestVersion: '1.19.0' });
+  eq('构建标记回退生效', find(env, 'updateLine').textContent, '当前已是最新版本（1.19.0）');
+}
+
+{
+  // 桥返回空串、构建标记无版本，则回退到页面自报的 __VITALS.version
+  const env = makeEnv({ version: null, vitalsVersion: 'v1.19.0-preview-20261008a' });
+  emit(env.sandbox, { status: 'checked', ok: true, hasUpdate: false, latestVersion: '1.19.0' });
+  eq('__VITALS.version 回退生效', find(env, 'updateLine').textContent, '当前已是最新版本（1.19.0-preview）');
+}
+
+{
+  // 签名不一致的错误必须原样透出，用户才知道该卸载重装而不是反复点更新
+  const env = makeEnv();
+  const text = '更新包与本机应用的签名不一致，系统会拒绝覆盖安装。请先导出备份后卸载旧版本再安装';
+  emit(env.sandbox, { status: 'error', message: text });
+  eq('签名错误原样展示', find(env, 'updateLine').textContent, text);
+  ok('签名错误也会 toast', env.toastBox.messages.some((m) => m === text));
+}
+
+{
+  // 网络不可达的错误应可据此排查
+  const env = makeEnv();
+  emit(env.sandbox, { status: 'error', message: '连接 GitHub 超时，请检查本机网络或代理后重试' });
+  eq('超时提示原样展示', find(env, 'updateLine').textContent, '连接 GitHub 超时，请检查本机网络或代理后重试');
 }
 
 console.log('\nTOTAL ' + passed + ' passed, ' + failures.length + ' failed');

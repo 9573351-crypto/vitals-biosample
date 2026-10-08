@@ -131,12 +131,20 @@ public class MainActivity extends Activity {
         if (updateBusy) { updateEvent("busy", null); return; }
         if (destroyed) { updateEvent("error", updateMessage("应用已关闭")); return; }
         updateBusy = true;
-        updateEvent("checking", null);
+        // 事件里带上本机版本：前端据此显示「当前版本」，不再依赖同步桥取值
+        try {
+            updateEvent("checking", new JSONObject().put("version", BuildConfig.VERSION_NAME).put("versionCode", BuildConfig.VERSION_CODE).put("repo", VitalsUpdater.REPO));
+        } catch (JSONException ignored) {
+            updateEvent("checking", null);
+        }
         io.execute(() -> {
             try {
                 updateEvent("checked", VitalsUpdater.check(this, BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME));
             } catch (Exception e) {
-                updateEvent("error", updateMessage(e.getMessage() == null ? "检查更新失败" : e.getMessage()));
+                String text = e.getMessage() == null ? "检查更新失败" : e.getMessage();
+                Log.w("VitalsUpdate", "check failed: " + text, e);
+                updateEvent("diagnostic", updateMessage(text));
+                updateEvent("error", updateMessage(text));
             } finally {
                 updateBusy = false;
             }
@@ -153,13 +161,29 @@ public class MainActivity extends Activity {
             try {
                 // 只信任 tag：安装包地址由原生重新解析，并再次通过域名白名单校验。
                 VitalsUpdater.Release release = VitalsUpdater.resolve(tag);
-                File apk = VitalsUpdater.download(this, release.apkUrl, release.apkSize > 0 ? release.apkSize : size, release.sha256 != null ? release.sha256 : sha256, (downloaded, total) -> {
+                java.util.List<String> candidates = VitalsUpdater.downloadCandidates(release);
+                if (candidates.isEmpty()) throw new IOException("该版本没有可用的安装包地址");
+                long expectedSize = release.apkSize > 0 ? release.apkSize : size;
+                String expectedSha = release.sha256 != null && !release.sha256.isEmpty() ? release.sha256 : sha256;
+                File apk = null;
+                Exception last = null;
+                for (String candidate : candidates) {
                     try {
-                        updateEvent("progress", new JSONObject().put("downloaded", downloaded).put("total", total).put("percent", total > 0 ? (int) (downloaded * 100 / total) : -1)
-                                .put("percentText", total > 0 ? (downloaded * 100 / total) + "%" : humanSize(downloaded)));
-                    } catch (JSONException ignored) { }
-                    return !destroyed;
-                });
+                        apk = VitalsUpdater.download(this, candidate, expectedSize, expectedSha, (downloaded, total) -> {
+                            try {
+                                updateEvent("progress", new JSONObject().put("downloaded", downloaded).put("total", total).put("percent", total > 0 ? (int) (downloaded * 100 / total) : -1)
+                                        .put("percentText", total > 0 ? (downloaded * 100 / total) + "%" : humanSize(downloaded)));
+                            } catch (JSONException ignored) { }
+                            return !destroyed;
+                        });
+                        last = null;
+                        break;
+                    } catch (Exception e) {
+                        last = e;
+                        Log.w("VitalsUpdate", "download candidate failed: " + candidate, e);
+                    }
+                }
+                if (apk == null) throw last == null ? new IOException("下载更新失败") : last;
                 pendingInstallPath = VitalsUpdater.verifyApk(this, apk);
                 try {
                     updateEvent("downloaded", new JSONObject().put("name", apk.getName()).put("size", apk.length()).put("sizeText", humanSize(apk.length())));
@@ -178,6 +202,13 @@ public class MainActivity extends Activity {
     }
     /** 交系统安装器处理新版本；未授予「安装未知应用」权限时先引导到系统设置。 */
     private void beginInstall(String path) {
+        // 覆盖安装要求同一签名：先自查，避免系统只报“应用未安装”而无法定位原因
+        String mismatch = VitalsUpdater.signatureMismatch(this, path);
+        if (mismatch != null) {
+            Log.w("VitalsUpdate", "signature mismatch, install aborted");
+            updateEvent("error", updateMessage(mismatch));
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getPackageManager().canRequestPackageInstalls()) {
             pendingInstallPath = path;
             updateEvent("permissionRequired", updateMessage("请在系统中允许本应用安装未知应用，返回后会自动继续"));
