@@ -1,0 +1,16 @@
+plugins { id 'com.android.application' }
+android {
+    buildFeatures { buildConfig true }
+    namespace 'com.vitals.android'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.vitals.android'
+        minSdk 26
+        targetSdk 34
+        versionCode 20
+        versionName '1.10.0'
+        testInstrumentationRunner 'com.vitals.android.DatabaseInstrumentation'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+dependencies { implementation 'androidx.annotation:annotation:1.9.1' }

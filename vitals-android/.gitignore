@@ -1,0 +1,5 @@
+.gradle/
+**/build/
+local.properties
+tools/usb-source/
+tools/*.zip

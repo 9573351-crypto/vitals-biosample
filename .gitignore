@@ -1,0 +1,34 @@
+# ===== Gradle / Android 构建产物 =====
+.gradle/
+**/build/
+local.properties
+captures/
+.cxx/
+output/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# ===== IDE =====
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+
+# ===== 操作系统 =====
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ===== 日志与临时文件 =====
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej

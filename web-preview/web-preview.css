@@ -1,0 +1,5 @@
+/* 网页预览版附加样式：只作用于预览层新增的控件，不覆盖原界面样式 */
+.preview-scan{margin-top:14px;padding-top:12px;border-top:1px solid rgba(127,127,127,.28)}
+.preview-scan p{margin:0 0 8px;font-size:13px;line-height:1.6;opacity:.72}
+.preview-scan-row{display:flex;gap:8px;align-items:center}
+.preview-scan-row .input{flex:1;min-width:0}

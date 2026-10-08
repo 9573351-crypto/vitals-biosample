@@ -1,0 +1,49 @@
+/* Touch adaptations are independent of the original Windows stylesheet. */
+button,input,select{min-height:44px;touch-action:manipulation}
+input,select,textarea{font-size:16px}
+.android-motion{margin-bottom:20px}
+.device-page-intro,.device-connect-card{display:flex;align-items:center;gap:14px;justify-content:space-between;padding:18px 20px;margin-bottom:16px}.device-page-intro h3,.device-connect-card h3{font-size:16px}.device-page-intro p,.device-connect-card p{margin-top:4px;color:var(--text-2);font-size:13px}.device-connect-card>div{flex:1}.device-connect-card .pill{max-width:420px;overflow-wrap:anywhere;text-align:center}
+#view-devices .scanner-connect{margin-bottom:16px;background:var(--surface)}#view-devices .android-motion{margin-bottom:16px}
+.android-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:14px 0}
+.android-task{padding:18px;border-radius:14px;background:#f0f7fa;line-height:1.7;overflow-wrap:anywhere}
+.temp-live-panel{margin-bottom:16px}.temp-live-panel .panel-head>div .muted{margin:4px 0 0;font-size:12px;color:var(--text-2)}
+.temp-channel-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}.temp-channel-card{padding:14px 16px;border-radius:14px;background:#f5f7fa;border:1px solid rgba(0,0,0,.06)}.temp-channel-card>span{font-size:12px;color:var(--text-2)}.temp-channel-card div{display:flex;align-items:baseline;gap:4px;margin:7px 0 4px}.temp-channel-card b{font-size:28px;line-height:1}.temp-channel-card em{font-size:14px;font-style:normal}.temp-channel-card small{font-size:11px;color:var(--text-3)}.temp-channel-card.good b{color:#248a3d}.temp-channel-card.warn b{color:#b25e00}.temp-channel-card.bad b{color:#c22}
+.temp-live-grid{display:grid;grid-template-columns:minmax(220px,1fr) minmax(320px,1.5fr);gap:14px;align-items:stretch}
+.temp-live-meta,.temp-serial-console{border-radius:14px;background:#f5f7fa;border:1px solid rgba(0,0,0,.06)}
+.temp-live-meta{display:grid;gap:2px;padding:12px 16px}.temp-live-meta>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06)}.temp-live-meta>div:last-child{border:0}.temp-live-meta span{font-size:12px;color:var(--text-2)}.temp-live-meta b{font-size:13px;overflow-wrap:anywhere;text-align:right}
+.temp-serial-console{overflow:hidden;background:#172033;color:#c9d1d9}.temp-console-head{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.1);font-size:12px}.temp-console-head .text-btn{color:#79c0ff}
+#tempSerialLog{height:126px;padding:10px 12px;overflow:auto;white-space:pre-wrap;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}#tempSerialLog .rec{color:#7ee787}#tempSerialLog .sys{color:#79c0ff}#tempSerialLog .err{color:#ff7b72}#tempSerialLog .empty-line{color:#8b949e}
+.stm32-console{margin-top:18px;padding:18px;border:1px solid rgba(10,105,255,.16);border-radius:14px;background:linear-gradient(135deg,rgba(10,105,255,.06),rgba(52,199,89,.04))}
+.stm32-console-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.stm32-console-head h4{font-size:15px;font-weight:650}.stm32-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+.stm32-fields label{display:grid;gap:6px;font-size:12px;color:var(--text-2)}.stm32-fields .input,.stm32-fields .select{width:100%}
+.stm32-command{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.stm32-command code{flex:1;min-width:260px;padding:13px 15px;border-radius:10px;background:#172033;color:#7ee787;font:600 16px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.02em}
+.stm32-log{height:132px;margin-top:14px;padding:12px;border-radius:10px;background:#172033;color:#c9d1d9;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap}.stm32-log .tx{color:#7ee787}.stm32-log .rx{color:#79c0ff}.stm32-log .err{color:#ff7b72}
+.android-check{display:flex;align-items:center;gap:12px;margin:12px 0}
+.android-check input{width:24px;height:24px;flex-shrink:0}
+.scanner-actions{display:grid;gap:10px;margin-bottom:16px}
+.scanner-connect{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 18px;border:1px solid rgba(10,105,255,.16);border-radius:14px;background:linear-gradient(135deg,rgba(10,105,255,.06),rgba(52,199,89,.04))}
+.scanner-connect>div{flex:1;min-width:240px}.scanner-connect p{margin:5px 0 0;color:var(--text-2);font-size:13px}.scanner-connect .pill.on{color:#087a3e;background:rgba(52,199,89,.14)}
+.scanner-buttons{display:flex;gap:10px;flex-wrap:wrap}
+.scanner-panel{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.58);backdrop-filter:blur(6px)}
+.scanner-panel.open{display:flex}.scanner-dialog{width:min(440px,100%);padding:24px;border-radius:18px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.28);text-align:center}
+.scanner-head{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}.scanner-symbol{margin:24px auto 14px;color:var(--primary);font-size:72px;line-height:1}.scanner-dialog p{color:var(--text-2)}
+#scannerStatus{min-height:48px;margin:16px 0;padding:12px;border-radius:10px;background:#f0f7fa;color:var(--text-1);overflow-wrap:anywhere}
+.modal{max-height:92vh;overflow-y:auto}.modal-body{overflow-y:auto}
+#usbPrintDialog button:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+#usbPrintDialog input[type=checkbox]{display:inline-block;width:22px;height:22px;vertical-align:middle;margin-right:8px}
+@media(max-width:1100px){.grid-2{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.temp-live-grid{grid-template-columns:1fr 1fr}.temp-serial-console{grid-column:1/-1}}
+@media(max-width:600px){.android-actions>*{max-width:100%}.form-row{flex-direction:column}.content{padding:14px}.toolbar-right .avatar{display:none}.stm32-fields,.temp-live-grid,.temp-channel-grid{grid-template-columns:1fr}.temp-serial-console{grid-column:auto}.stm32-command code{min-width:100%;font-size:14px}.device-page-intro,.device-connect-card{align-items:flex-start;flex-direction:column}}
+@media(max-width:900px){
+ .sample-row{display:grid;grid-template-columns:48px minmax(0,1fr) 72px;gap:12px;padding:16px}
+ .sample-thumb{width:48px;height:48px;grid-column:1;grid-row:1}
+ .sample-mid{grid-column:2;grid-row:1}.sample-name{white-space:normal;overflow-wrap:anywhere}
+ .sample-sub{white-space:normal;overflow-wrap:anywhere}
+ .barcode-mini{grid-column:3;grid-row:1 / span 2}
+ .sample-right{grid-column:1 / span 2;grid-row:2;flex-wrap:wrap;gap:8px}
+ .sample-actions{grid-column:1 / -1;grid-row:3;flex-direction:row;justify-content:flex-end}
+ .sample-actions button{min-width:90px;min-height:44px}
+ .lib-head{flex-wrap:wrap}.lib-head .search-box{min-width:0;flex-basis:100%}
+ .lib-actions{margin-left:auto}.detail-top{flex-wrap:wrap}
+}
+.temp-channel-card .temp-range{display:block;margin:2px 0;font-size:11px;font-weight:600;color:var(--blue)}

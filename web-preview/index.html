@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Vitals · 生息 — 生物样本动态管理库</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="stylesheet" href="styles.css?v=20260928a"><link rel="stylesheet" href="android.css?v=20260928a"><link rel="stylesheet" href="web-preview.css?v=20260928a">
+<script src="vendor/qrcode.min.js?v=20260928a" defer></script>
+<script src="vendor/chart.umd.js?v=20260928a" defer></script>
+<script src="motion-core.js?v=20260928a" defer></script><script src="web-bridge.js?v=20260928a" defer></script><script src="persistence.js?v=20260928a" defer></script><script src="app.js?v=20260928a" defer></script><script src="android.js?v=20260928a" defer></script><script src="scanner.js?v=20260928a" defer></script><script src="printer.js?v=20260928a" defer></script>
+</head>
+<body>
+
+<!-- ===== 侧边栏 ===== -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark"><img src="assets/logo.png" alt="Vitals"></div>
+    <div class="brand-text">
+      <span class="brand-name">生息</span>
+      <span class="brand-sub">Vitals · 生物样本库</span>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-item active" data-view="dashboard">
+      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg></span><span class="nav-label">概览</span>
+    </button>
+    <button class="nav-item" data-view="library">
+      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5v5H4zM11 4h9v5h-9zM4 11h5v9H4zM11 15h9v5h-9z"/></svg></span><span class="nav-label">样本库</span>
+    </button>
+    <button class="nav-item" data-view="inventory">
+      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7 12 3l8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/><path d="M12 11v10"/><path d="m8 14-2 2 2 2M16 14l2 2-2 2"/></svg></span><span class="nav-label">出入库</span>
+    </button>
+    <button class="nav-item" data-view="devices">
+      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M12 8v8"/><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 4V2M17 4V2M7 22v-2M17 22v-2"/></svg></span><span class="nav-label">设备连接</span>
+    </button>
+    <button class="nav-item" data-view="monitor">
+      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3.2l2.4-6 4 12 3-9 2 3h5.4"/></svg></span><span class="nav-label">实时监测</span>
+    </button>
+    <button class="nav-item" data-view="records">
+      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1.4"/><circle cx="4" cy="12" r="1.4"/><circle cx="4" cy="18" r="1.4"/></svg></span><span class="nav-label">动态记录</span>
+    </button>
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="migrate-group">
+      <div class="migrate-title">数据迁移</div>
+      <div class="migrate-btns">
+        <button class="btn ghost mini" id="exportBtn" title="导出全量备份">导出</button>
+        <button class="btn ghost mini" id="importBtn" title="从备份文件导入">导入</button>
+        <button class="btn danger mini" id="resetBtn" title="清空全部样本与记录">清空</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
+      </div>
+    </div>
+    <div class="build-tag" id="buildTag" title="当前实际加载的构建指纹（用于核对是否为新版本）"></div>
+    <button class="nav-item" data-view="settings">
+      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .34 1.77l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.77-.34 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.77.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .34-1.77 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.34-1.77l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.77.34h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.77-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.34 1.77v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="nav-label">设置</span>
+    </button>
+  </div>
+</aside>
+
+<!-- ===== 主区域 ===== -->
+<main class="main">
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <button class="icon-btn" id="menuBtn" aria-label="菜单"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <h1 class="page-title" id="pageTitle">概览</h1>
+    </div>
+    <div class="toolbar-right">
+      <button class="seg-btn" id="serialBtn">
+        <span class="dot"></span>连接设备
+      </button>
+      <button class="icon-btn" title="搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg></button>
+      <div class="avatar" id="avatar">V</div>
+    </div>
+  </header>
+
+  <div class="content">
+    <!-- 概览 -->
+    <section class="view active" id="view-dashboard">
+      <div class="cards">
+        <div class="stat-card glass device-online-card" id="deviceOnlineCard" role="button" tabindex="0" aria-label="打开设备连接">
+          <div class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7 12 4l8 3-8 3-8-3z"/><path d="M4 7v10l8 3 8-3V7"/><path d="M4 7l8 3 8-3"/></svg></div>
+          <div><div class="stat-num" id="statTotal">0</div><div class="stat-label">样本总数</div></div>
+        </div>
+        <div class="stat-card glass">
+          <div class="stat-ic blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.6"/></svg></div>
+          <div><div class="stat-num" id="statActive">0</div><div class="stat-label">实时监控中</div></div>
+        </div>
+        <div class="stat-card glass">
+          <div class="stat-ic green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg></div>
+          <div><div class="stat-num" id="statOnline">0</div><div class="stat-label">设备在线</div><div class="stat-detail" id="statOnlineDetail">温控 0 · 机械 0 · 扫码枪 0 · 打印机 0</div></div>
+        </div>
+        <div class="stat-card glass">
+          <div class="stat-ic amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 14.6V5.5a2.5 2.5 0 0 0-5 0v9.1a4.3 4.3 0 1 0 5 0z"/><path d="M12 8.5v6.8"/></svg></div>
+          <div><div class="stat-num" id="statAlert">0</div><div class="stat-label">温度异常</div></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel glass">
+          <div class="panel-head"><h3>库容分布</h3></div>
+          <div class="donut-wrap">
+            <canvas id="chartLib"></canvas>
+            <div class="donut-center"><b id="capTotal">0</b><span>样本总数</span></div>
+          </div>
+          <div class="cap-stats">
+            <div class="cap-row"><i style="background:#34c759"></i><span>正常</span><b id="capNormal">0</b></div>
+            <div class="cap-row"><i style="background:#ffb340"></i><span>预警</span><b id="capWarn">0</b></div>
+            <div class="cap-row"><i style="background:#ff5f57"></i><span>异常</span><b id="capBad">0</b></div>
+          </div>
+        </div>
+        <div class="panel glass">
+          <div class="panel-head"><h3>近期采集动态</h3><button class="text-btn" data-go="records">查看全部</button></div>
+          <div class="feed" id="feedRecent"><div class="empty">暂无样本动态</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 样本库 -->
+    <section class="view" id="view-library">
+      <div class="lib-head">
+        <div class="search-box">
+          <span class="search-ic">⌕</span>
+          <input id="searchInput" type="text" placeholder="搜索样本名称 / 编号 / 条形码">
+          <button class="text-btn clear" id="clearSearch">清除</button>
+        </div>
+        <div class="lib-actions">
+          <button class="btn primary" id="addSampleBtn">＋ 录入样本</button>
+        </div>
+      </div>
+      <div class="sample-list glass" id="sampleList"><div class="empty">点击右上角“录入样本”开始创建</div></div>
+    </section>
+
+    <!-- 出入库 -->
+    <section class="view" id="view-inventory">
+      <div class="device-page-intro glass"><div><h3>五槽位样本出入库</h3><p>人工模式由操作人员确认；硬件出库收到机械板 OK 后自动更新库存并释放槽位。</p></div><button class="btn ghost" data-go="devices">前往设备连接</button></div>
+      <div id="motionOperationMount"></div>
+    </section>
+
+    <!-- 设备连接 -->
+    <section class="view" id="view-devices">
+      <div class="device-page-intro glass"><div><h3>外接设备集中管理</h3><p>温度板、扫码枪、机械板和标签打印机在此连接。每个设备使用独立 USB 通道，可以同时通讯。</p></div><span class="pill" id="devicePageSummary">0 个设备在线</span></div>
+      <div class="monitor-head glass" id="sensorDevicePanel">
+        <div class="mh-left">
+          <h3>温度采集板</h3>
+          <p class="muted">接收 B1、B2、B3 三路类别温度。选择与温度板一致的波特率，串口参数为 8N1。</p>
+        </div>
+        <div class="mh-right">
+          <span class="pill" id="sensorDeviceStatus">未连接</span>
+          <select id="baudSelect" class="select">
+            <option selected>115200</option><option>9600</option><option>57600</option>
+          </select>
+          <button class="btn primary" id="connectBtn">连接温度板</button>
+          <button class="btn ghost hidden" id="disconnectBtn">断开温度板</button>
+        </div>
+      </div>
+      <div id="scannerDeviceActions"></div>
+      <div id="motionDeviceMount"></div>
+      <div class="device-connect-card glass" id="printerDeviceCard">
+        <div><h3>得力 USB 标签打印机</h3><p>连接只检查打印机型号和就绪状态，不会自动走纸或打印。</p></div>
+        <span class="pill" id="devicePrinterStatus">未检测</span>
+        <button class="btn primary" id="devicePrinterConnect">连接打印机</button>
+      </div>
+    </section>
+
+    <!-- 实时监测 -->
+    <section class="view" id="view-monitor">
+      <div class="panel glass temp-live-panel">
+        <div class="panel-head">
+          <div><h3>温度串口实时显示</h3><p class="muted">B1 → A类（全血），B2 → B类（血清），B3 → C类（血浆）</p></div>
+          <span class="pill" id="tempSerialStatus">温度串口未连接</span>
+        </div>
+        <div class="temp-channel-grid">
+          <div class="temp-channel-card" id="tempCardB1"><span>B1 · A类（全血）</span><div><b id="tempB1">--.-</b><em>℃</em></div><small class="temp-range" id="tempRangeB1">适宜存储温度 —</small><small id="tempTimeB1">等待数据</small></div>
+          <div class="temp-channel-card" id="tempCardB2"><span>B2 · B类（血清）</span><div><b id="tempB2">--.-</b><em>℃</em></div><small class="temp-range" id="tempRangeB2">适宜存储温度 —</small><small id="tempTimeB2">等待数据</small></div>
+          <div class="temp-channel-card" id="tempCardB3"><span>B3 · C类（血浆）</span><div><b id="tempB3">--.-</b><em>℃</em></div><small class="temp-range" id="tempRangeB3">适宜存储温度 —</small><small id="tempTimeB3">等待数据</small></div>
+        </div>
+        <div class="temp-live-grid">
+          <div class="temp-live-meta">
+            <div><span>对应范围</span><b id="tempLiveSample">未绑定</b></div>
+            <div><span>最近接收</span><b id="tempLiveTime">—</b></div>
+            <div><span>数据格式</span><b id="tempLiveFormat">—</b></div>
+          </div>
+          <div class="temp-serial-console">
+            <div class="temp-console-head"><span>串口接收日志</span><button class="text-btn" id="tempLogClear">清空</button></div>
+            <div id="tempSerialLog"><div class="empty-line">等待温度板发送数据…</div></div>
+          </div>
+        </div>
+      </div>
+      <div id="bridgePanel" class="bridge glass">
+        <div class="bridge-title"><h3>模拟串口桥 · 演示模式</h3><button class="text-btn" id="simStartBtn">开始模拟</button></div>
+        <div class="bridge-log" id="simLog"></div>
+      </div>
+      <div class="panel glass">
+        <div class="panel-head"><h3>排架实时状态</h3><span class="pill" id="rackPill">离线</span></div>
+        <div class="rack" id="rackGrid"></div>
+      </div>
+      <div>
+        <div class="panel glass"><div class="panel-head"><h3>温度 ℃ <span class="pill mon-sel" id="monSelPill">未选择</span></h3></div><canvas id="chartTemp"></canvas></div>
+      </div>
+    </section>
+
+    <!-- 动态记录 -->
+    <section class="view" id="view-records">
+      <div class="panel glass">
+        <div class="panel-head"><h3>操作与采集记录</h3><span id="recordCount" class="pill">0 条</span></div>
+        <div class="record-table-wrap"><table class="record-table" id="recordTable">
+          <thead><tr><th>时间</th><th>样本</th><th>类型</th><th>详情</th></tr></thead>
+          <tbody id="recordBody"></tbody>
+        </table>
+        <div class="empty" id="recordEmpty">暂无记录</div></div>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="view" id="view-settings">
+      <div class="panel glass">
+        <div class="panel-head"><h3>偏好设置</h3></div>
+        <div class="setting-row"><label>采集温度报警阈值上限（℃）</label><input id="setHi" type="number" class="input"></div>
+        <div class="setting-row"><label>采集温度报警阈值下限（℃）</label><input id="setLo" type="number" class="input"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ===== 录入弹窗 ===== -->
+<div class="modal-mask" id="sampleModal">
+  <div class="modal glass-panel">
+    <div class="modal-head">
+      <h3 id="modalTitle">录入样本</h3>
+      <button class="icon-btn close" id="closeModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="field"><span>样本名称 *</span><input id="fName" class="input" placeholder="例如：血清样本-01" required></label>
+        <label class="field"><span>样本编号 *</span><input id="fCode" class="input" placeholder="自动生成或手动填写"></label>
+      </div>
+      <div class="form-row">
+        <label class="field"><span>样本类型</span><select id="fType" class="select">
+          <option>全血</option><option>血清</option><option>血浆</option><option>DNA</option><option>RNA</option><option>尿液</option><option>组织切片</option><option>其他</option>
+        </select></label>
+        <label class="field"><span>存放位置</span><input id="fLoc" class="input" placeholder="如 A-01-03"></label>
+      </div>
+      <div class="form-row">
+        <label class="field"><span>采集时间</span><input id="fTime" type="datetime-local" class="input"></label>
+        <label class="field"><span>采集温度 ℃</span><input id="fTemp" type="number" class="input" placeholder="如 -80 或 4"></label>
+      </div>
+      <div class="form-row">
+        <label class="field"><span>备注</span><input id="fNote" class="input" placeholder="可选备注信息"></label>
+      </div>
+      <div class="photo-field">
+        <span>样本照片</span>
+        <div class="photo-drop" id="photoDrop">
+          <input type="file" id="photoInput" accept="image/*" hidden>
+          <div class="photo-placeholder" id="photoPlaceholder"><span class="ph-ic">＋</span><span>点击上传或拖拽照片</span></div>
+          <img id="photoPreview" class="photo-preview" hidden alt="预览">
+          <button class="icon-btn remove-photo" id="removePhoto" hidden>✕</button>
+        </div>
+      </div>
+      <div class="barcode-preview" id="barcodePreview"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="modalCancel">取消</button>
+      <button class="btn primary" id="modalSave">保存样本</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 样本详情弹窗 ===== -->
+<div class="modal-mask" id="detailModal">
+  <div class="modal glass-panel detail-modal">
+    <div class="modal-head">
+      <h3 id="detailTitle">样本详情</h3>
+      <button class="icon-btn close" id="closeDetail">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-top">
+        <div class="detail-photo" id="detailPhoto">无</div>
+        <div class="detail-info">
+          <div class="di-name" id="diName">—</div>
+          <div class="di-code" id="diCode">—</div>
+          <div class="badges" id="diBadges"></div>
+        </div>
+      </div>
+      <div class="di-grid">
+        <div class="di-cell"><span>类型</span><b id="diType">—</b></div>
+        <div class="di-cell"><span>位置</span><b id="diLoc">—</b></div>
+        <div class="di-cell"><span>采集时间</span><b id="diTime">—</b></div>
+        <div class="di-cell"><span>采集温度</span><b id="diTemp">—</b></div>
+        <div class="di-cell"><span>最近读数</span><b id="diLast">—</b></div>
+        <div class="di-cell"><span>状态</span><b id="diState">—</b></div>
+      </div>
+      <div class="qr-slot" id="diQR"></div>
+      <div class="qr-hint">二维码仅包含样本编号；样本详情和当前库存以本机记录为准</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="detailEdit">编辑</button>
+      <button class="btn primary" id="printBtn">打印标签</button>
+    </div>
+  </div>
+</div>
+
+<!-- 打印区 -->
+<div id="printArea"></div>
+
+<!-- 应用内确认弹窗（替代 Electron 下不可靠的原生 confirm） -->
+<div class="modal-mask confirm-mask" id="confirmModal">
+  <div class="modal confirm-modal">
+    <div class="modal-head"><h3 id="confirmTitle">确认</h3></div>
+    <div class="modal-body"><p class="confirm-msg" id="confirmMsg"></p></div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="confirmNo">取消</button>
+      <button class="btn danger" id="confirmYes">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 注入构建版本标记（用于排错缓存）
+window.__VITALS = { version: 'v1.10.0-preview-20260928a', build: Date.now() };
+</script>
+</body>
+</html>
