@@ -15,6 +15,7 @@ captures/
 # ===== 仓库里的临时目录与原始发布包 =====
 .backup-*/
 .staging-*/
+.local-ci/
 *.zip
 *.7z
 *.rar
