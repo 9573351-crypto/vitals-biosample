@@ -49,20 +49,56 @@ function refreshExternalDevices(){
   else renderDeviceStats();
 }
 
-function refreshMotionPanel(){
+function renderStorageVisual(){
+  const root=$('#storageVisual');if(!root)return;
+  const task=state.set.motionTask,selectedType=$('#motionType')?.value,selectedSlot=Number($('#motionSlot')?.value);
+  const discCodes=['A','B','C'];
+  root.innerHTML=MotionCore.storageTypes.map((type,discIndex)=>{
+    const slots=[1,2,3,4,5].map((slot,index)=>{
+      const sample=Object.values(state.s.samples).find(x=>x.status!=='out'&&x.type===type&&x.slot===slot);
+      const processing=task&&state.s.samples[task.sampleId]?.type===type&&task.slot===slot;
+      const selected=!task&&!sample&&type===selectedType&&slot===selectedSlot;
+      const cls=['storage-slot',sample?'occupied':'empty',processing?'processing':'',selected?'selected':''].filter(Boolean).join(' ');
+      const label=MotionCore.slotLabel(type,slot)+(sample?'，已占用':'，空闲');
+      return `<button class="${cls}" style="--slot-index:${index}" data-type="${esc(type)}" data-slot="${slot}"${sample?` data-sample="${esc(sample.id)}"`:''} aria-label="${esc(label)}"><span class="storage-hole" aria-hidden="true"><i class="storage-vial"></i></span><span class="storage-slot-number" aria-hidden="true">${slot}</span></button>`;
+    }).join('');
+    const discName=discCodes[discIndex]+'-'+type;
+    return `<div class="storage-disc disc-${discIndex}${type===selectedType?' active':''}" data-type="${esc(type)}" role="group" aria-label="${esc(discName+'圆盘')}"><div class="storage-disc-edge" aria-hidden="true"></div><div class="storage-disc-ring" aria-hidden="true"></div><div class="storage-disc-name"><strong>${esc(discCodes[discIndex])}</strong><span>${esc(type)}</span></div>${slots}</div>`;
+  }).join('');
+  root.querySelectorAll('.storage-disc').forEach(disc=>disc.addEventListener('click',e=>{
+    if(e.target.closest('.storage-slot')||state.set.motionTask)return;
+    $('#motionType').value=disc.dataset.type;refreshMotionPanel(true);
+  }));
+  root.querySelectorAll('.storage-slot').forEach(button=>button.addEventListener('click',()=>{
+    if(button.dataset.sample){openDetail(button.dataset.sample);return;}
+    if(state.set.motionTask)return;
+    $('#motionType').value=button.dataset.type;refreshMotionPanel();
+    const option=Array.from($('#motionSlot').options).find(x=>x.value===button.dataset.slot);
+    if(option&&!option.disabled){$('#motionSlot').value=button.dataset.slot;renderStorageVisual();}
+  }));
+}
+
+function refreshMotionPanel(autoPick=false){
   const select=$('#motionSlot');if(!select)return;
-  const selected=Number(select.value),task=state.set.motionTask;
-  const slots=[1,2,3,4,5].map(slot=>({slot,sample:Object.values(state.s.samples).find(x=>x.status!=='out'&&x.slot===slot)}));
+  const selected=Number(select.value),task=state.set.motionTask,typeSelect=$('#motionType');
+  const taskSample=task&&state.s.samples[task.sampleId];
+  let type=taskSample?.type||typeSelect.value||MotionCore.storageTypes[0];
+  if(!MotionCore.storageTypes.includes(type))type=MotionCore.storageTypes[0];
+  typeSelect.value=type;
+  const slots=[1,2,3,4,5].map(slot=>({slot,sample:Object.values(state.s.samples).find(x=>x.status!=='out'&&x.type===type&&x.slot===slot),reserved:Object.values(state.s.samples).find(x=>x.status==='out'&&x.type===type&&x.plannedSlot===slot)}));
   select.replaceChildren();
-  slots.forEach(({slot,sample})=>{const option=document.createElement('option');option.value=slot;option.textContent=MotionCore.position(slot)+' 号 · '+(sample?'已占用：'+sample.name:task&&task.slot===slot?'任务处理中':'空闲');option.disabled=!!sample||!!(task&&task.slot===slot);select.append(option);});
-  const free=slots.filter(x=>!x.sample&&(!task||task.slot!==x.slot));
-  select.value=String(free.some(x=>x.slot===selected)?selected:free[0]?.slot||'');
+  const taskUsesDisc=task&&taskSample?.type===type;
+  slots.forEach(({slot,sample,reserved})=>{const option=document.createElement('option');option.value=slot;option.textContent=slot+' 号 · '+(sample?'已占用：'+sample.name:reserved?'已预选：'+reserved.name:taskUsesDisc&&task.slot===slot?'任务处理中':'空闲');option.disabled=!!sample||!!reserved||!!(taskUsesDisc&&task.slot===slot);select.append(option);});
+  const free=slots.filter(x=>!x.sample&&!x.reserved&&(!taskUsesDisc||task.slot!==x.slot));
+  select.value=String(!autoPick&&free.some(x=>x.slot===selected)?selected:free[0]?.slot||'');
   select.disabled=!!task||!free.length;
-  $('#slotSummary').textContent=slots.map(x=>MotionCore.position(x.slot)+'号：'+(x.sample?x.sample.name:task&&task.slot===x.slot?'任务处理中':'空闲')).join('；')+(free.length?'':'。当前没有可用槽位，请先完成出库或处理当前任务。');
+  typeSelect.disabled=!!task;
+  $('#slotSummary').textContent=type+'圆盘：'+slots.map(x=>x.slot+'号 '+(x.sample?x.sample.name:x.reserved?'已预选 '+x.reserved.name:taskUsesDisc&&task.slot===x.slot?'任务处理中':'空闲')).join('；')+(free.length?'；已自动选择 '+select.value+' 号空余位置。':'。该圆盘已满，请先完成出库或处理当前任务。');
   $('#motionDisconnect').classList.toggle('hidden',!hardware.motion);
   $('#motionConnect').classList.toggle('hidden',hardware.motion);
   $('#motionMode').disabled=!!task;
   $('#motionConnection').textContent=hardware.motion?'机械板已连接':'机械板未连接';
+  renderStorageVisual();
 }
 window.refreshMotionPanel=refreshMotionPanel;
 
@@ -85,15 +121,22 @@ function setSampleStatus(id,action){
   if(state.set.motionTask){toast('请先处理当前任务');return;}
   const x=state.s.samples[id];
   if(!x || !['in','out'].includes(action) || x.status===action)return;
+  if(!MotionCore.storageTypes.includes(x.type)){toast('当前只支持全血、血清、血浆样本出入库');return;}
+  if(action==='in'){
+    $('#motionType').value=x.type;refreshMotionPanel(true);
+    const planned=Number(x.plannedSlot),option=Array.from($('#motionSlot').options).find(o=>Number(o.value)===planned);
+    if(option&&option.disabled&&option.textContent.includes('已预选：'+x.name)){option.disabled=false;$('#motionSlot').disabled=false;}
+    if(option&&!option.disabled){$('#motionSlot').value=String(planned);renderStorageVisual();}
+  }
   const slot=action==='in'?Number($('#motionSlot').value):x.slot;
   if(!Number.isInteger(slot)||slot<1||slot>5){toast(action==='in'?'没有可用入库槽位，请查看槽位占用或先完成出库':'该样本尚未绑定实际槽位，请先核实并绑定');goView('inventory');return;}
-  if(!MotionCore.slotFree(state.s.samples,slot,id)){toast('该槽位已被其他样本占用');return;}
+  if(!MotionCore.slotFree(state.s.samples,x.type,slot,id)){toast(x.type+'圆盘的该槽位已被占用');return;}
   const mode=$('#motionMode').value;
   if(mode==='hardware'&&!hardware.motion){toast('请先连接机械控制板');goView('devices');return;}
   confirmDialog(action==='in'?'准备入库':'准备出库',
-    `样本：${x.name}；槽位：${MotionCore.position(slot)}。${mode==='hardware'?'将发送机械指令：'+MotionCore.command(x,action,slot)+'。':'人工模式：不会发送机械指令。'}${action==='in'?'请确认已按机械组约定放好样本。':''}`,
+    `样本：${x.name}；位置：${MotionCore.slotLabel(x.type,slot)}。${mode==='hardware'?'将发送机械指令：'+MotionCore.command(x,action,slot)+'。':'人工模式：不会发送机械指令。'}${action==='in'?'请确认已按机械组约定放好样本。':''}`,
     ()=>{
-      const task={taskId:'T-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),sampleId:id,action,slot,mode,phase:mode==='hardware'?'sent':'verify',createdAt:Date.now()};
+      const task={taskId:'T-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),sampleId:id,sampleType:x.type,action,slot,mode,phase:mode==='hardware'?'sent':'verify',createdAt:Date.now()};
       if(!persistTask(task))return;
       if(mode==='hardware'){
         AndroidHost.send('motion',MotionCore.command(x,action,slot));
@@ -109,12 +152,16 @@ function renderTask(){
   if(!t){el.textContent='暂无任务。新录入样本处于待入库状态；完成操作后才更新库存。';return;}
   const labels={sent:'指令已提交，等待硬件响应',accepted:'硬件已接收，等待到位',arrived:'硬件报告位置到位，仍需人工确认样本',verify:'需要人工确认位置及样本',uncertain:'结果待核实，库存保持原状态'};
   const waitingOk=t.action==='out'&&t.mode==='hardware'&&['sent','accepted'].includes(t.phase);
+  const needsScanner=t.action==='out'&&t.mode==='hardware';
+  const checkText=t.mode==='manual'?`我已核实样本已${t.action==='in'?'放好':'取出'}`:`我已核实机械位置正确，样本已${t.action==='in'?'放好':'取出'}`;
   const controls=waitingOk
     ? `<p class="hardware-ok-wait">等待机械板返回 <code>OK</code>；收到后将自动出库并释放槽位。</p><div class="android-actions"><button class="btn ghost" id="abortTask">核实未完成，保留原库存</button></div>`
-    : `<label class="android-check"><input type="checkbox" id="positionChecked">我已核实机械位置正确，样本已${t.action==='in'?'放好':'取出'}</label>${t.action==='out'?'<button class="btn primary" id="scannerVerifyOut">扫码枪核对出库样本</button><p id="scannerVerifyStatus">'+(scannerVerification?'二维码核对通过':'尚未核对，请使用扫码枪扫描本次出库样本')+'</p>':''}<div class="android-actions"><button class="btn primary" id="finishTask">人工确认完成</button><button class="btn ghost" id="abortTask">核实未完成，保留原库存</button></div>`;
-  el.innerHTML=`<b>${esc(t.action==='in'?'入库':'出库')} · 槽位 ${esc(MotionCore.position(t.slot))} · ${esc(state.s.samples[t.sampleId]?.name||t.sampleId)}</b><p>${esc(labels[t.phase]||t.phase)}</p><p>${esc(t.error||'')}</p>${controls}`;
+    : `<label class="android-check"><input type="checkbox" id="positionChecked">${checkText}</label>${needsScanner?'<button class="btn primary" id="scannerVerifyOut">扫码枪核对出库样本</button><p id="scannerVerifyStatus">'+(scannerVerification?'二维码核对通过':'尚未核对，请使用扫码枪扫描本次出库样本')+'</p>':''}<div class="android-actions"><button class="btn primary" id="finishTask">人工确认完成</button><button class="btn ghost" id="abortTask">核实未完成，保留原库存</button></div>`;
+  const sample=state.s.samples[t.sampleId],type=sample?.type||t.sampleType;
+  const place=MotionCore.storageTypes.includes(type)?MotionCore.slotLabel(type,t.slot):'槽位 '+MotionCore.position(t.slot);
+  el.innerHTML=`<b>${esc(t.action==='in'?'入库':'出库')} · ${esc(place)} · ${esc(sample?.name||t.sampleId)}</b><p>${esc(labels[t.phase]||t.phase)}</p><p>${esc(t.error||'')}</p>${controls}`;
   if(!waitingOk){
-    if(t.action==='out'){$('#scannerVerifyOut').disabled=['sent','accepted'].includes(t.phase);$('#scannerVerifyOut').onclick=()=>window.openVitalsScanner('verify',t.taskId);}
+    if(needsScanner){$('#scannerVerifyOut').disabled=['sent','accepted'].includes(t.phase);$('#scannerVerifyOut').onclick=()=>window.openVitalsScanner('verify',t.taskId);}
     $('#finishTask').disabled=['sent','accepted'].includes(t.phase);
     $('#finishTask').onclick=finishTask;
   }
@@ -129,14 +176,14 @@ function finishTask(){
   const t=state.set.motionTask;if(!t||['sent','accepted'].includes(t.phase))return;
   const x=state.s.samples[t.sampleId];if(!x)return;
   if(!$('#positionChecked').checked){toast('请先核实位置和样本');return;}
-  if(t.action==='out'){
+  if(t.action==='out'&&t.mode==='hardware'){
     if(!scannerVerification||scannerVerification.taskId!==t.taskId||scannerVerification.sampleId!==x.id||![x.code,x.id].includes(scannerVerification.code)){toast('请先使用扫码枪核对出库样本');return;}
   }
-  if(!MotionCore.slotFree(state.s.samples,t.slot,x.id)){toast('槽位冲突，请核实');return;}
+  if(!MotionCore.slotFree(state.s.samples,x.type,t.slot,x.id)){toast(x.type+'圆盘槽位冲突，请核实');return;}
   x.status=t.action;x.pendingIntake=false;x.updatedAt=Date.now();
-  if(t.action==='in'){x.slot=t.slot;x.loc='圆盘-'+MotionCore.position(t.slot);}else{x.lastSlot=t.slot;delete x.slot;x.loc='已出库';}
+  if(t.action==='in'){x.slot=t.slot;x.loc=MotionCore.slotLabel(x.type,t.slot);delete x.plannedSlot;}else{x.lastSlot=t.slot;delete x.slot;x.loc='已出库';}
   state.set.motionTask=null;
-  state.rec.unshift({time:FMT.now(),sample:x.name,sampleId:x.id,code:x.code||null,slot:t.slot,status:t.action,taskId:t.taskId,type:t.action==='in'?'入库':'出库',detail:`人工确认完成，槽位 ${MotionCore.position(t.slot)}，任务 ${t.taskId}`});
+  state.rec.unshift({time:FMT.now(),sample:x.name,sampleId:x.id,code:x.code||null,slot:t.slot,status:t.action,taskId:t.taskId,type:t.action==='in'?'入库':'出库',detail:`人工确认完成，${MotionCore.slotLabel(x.type,t.slot)}，任务 ${t.taskId}`});
   state.rec=state.rec.slice(0,500);
   if(!saveAll())return;
   clearTimeout(taskTimer);reloadUI();renderTask();toast('库存已更新');
@@ -146,7 +193,7 @@ function finishHardwareOutbound(t){
   const x=state.s.samples[t.sampleId];if(!x||x.status==='out')return false;
   x.status='out';x.pendingIntake=false;x.updatedAt=Date.now();x.lastSlot=t.slot;delete x.slot;x.loc='已出库';
   state.set.motionTask=null;scannerVerification=null;
-  state.rec.unshift({time:FMT.now(),sample:x.name,sampleId:x.id,code:x.code||null,slot:t.slot,status:'out',taskId:t.taskId,type:'出库',detail:`机械板返回 OK，自动完成出库并释放槽位 ${MotionCore.position(t.slot)}，任务 ${t.taskId}`});
+  state.rec.unshift({time:FMT.now(),sample:x.name,sampleId:x.id,code:x.code||null,slot:t.slot,status:'out',taskId:t.taskId,type:'出库',detail:`机械板返回 OK，自动完成出库并释放${MotionCore.slotLabel(x.type,t.slot)}，任务 ${t.taskId}`});
   state.rec=state.rec.slice(0,500);
   if(!saveAll())return false;
   clearTimeout(taskTimer);reloadUI();renderTask();toast('机械板返回 OK，样本已出库');return true;
@@ -177,6 +224,7 @@ function receiveImport(text){
 }
 window.onAndroidEvent=(type,role,text)=>{
   if(type==='devices'&&role==='external'){applyExternalDevices(text);return;}
+  if(type==='update'){if(window.onVitalsUpdateEvent)window.onVitalsUpdateEvent(text);return;}
   if(role==='printer'){if(window.onPrinterEvent)window.onPrinterEvent(type,text);return;}
   if(type==='import'){receiveImport(text);return;}
   if(type==='line'){
@@ -232,45 +280,47 @@ window.androidBack=()=>{
 document.addEventListener('DOMContentLoaded',()=>{
   refreshExternalDevices();
   const panel=document.createElement('div');panel.className='panel glass android-motion';
-  panel.innerHTML=`<div class="panel-head"><h3>机械控制板连接</h3><span class="pill" id="motionConnection">机械板未连接</span></div><p class="muted">机械板使用独立 USB 串口。断开连接只关闭通讯，不会停止电机或改变库存。</p><div class="android-actions"><select class="select" id="motionBaud"><option>115200</option><option>9600</option><option>57600</option></select><button class="btn primary" id="motionConnect">连接机械板</button><button class="btn ghost" id="motionDisconnect">断开机械板连接</button></div><div class="stm32-console"><div class="stm32-console-head"><h4>STM32 串口调试</h4><span class="pill" id="stm32Status">CH340 未连接</span></div><p class="muted">手动调试发送动作和样本种类／圆槽位置两段信息。串口参数为 8N1，发送时追加换行符。</p><div class="stm32-fields"><label>动作<select class="select" id="stm32Action"><option value="IN">IN · 入库</option><option value="OUT">OUT · 出库</option></select></label><label>样本种类<select class="select" id="stm32Category">${'ABCDEFGH'.split('').map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label><label>圆槽位置<select class="select" id="stm32Position">${[0,1,2,3,4].map(x=>`<option value="${x}">${x} 号</option>`).join('')}</select></label></div><div class="stm32-command"><code id="stm32CommandPreview">IN,A-0</code><button class="btn primary" id="stm32Send" disabled>发送到 STM32</button><button class="btn ghost" id="stm32ClearLog">清空日志</button></div><div class="stm32-log" id="stm32Log"><div>等待连接 CH340…</div></div></div>`;
+  panel.innerHTML=`<div class="panel-head"><h3>机械控制板连接</h3><span class="pill" id="motionConnection">机械板未连接</span></div><p class="muted">机械板使用独立 USB 串口。断开连接只关闭通讯，不会停止电机或改变库存。</p><div class="android-actions"><select class="select" id="motionBaud"><option>115200</option><option>9600</option><option>57600</option></select><button class="btn primary" id="motionConnect">连接机械板</button><button class="btn ghost" id="motionDisconnect">断开机械板连接</button></div><div class="stm32-console"><div class="stm32-console-head"><h4>STM32 串口调试</h4><span class="pill" id="stm32Status">CH340 未连接</span></div><p class="muted">手动调试发送动作、圆盘类别和槽位。A=全血，B=血清，C=血浆；串口参数为 8N1，发送时追加换行符。</p><div class="stm32-fields"><label>动作<select class="select" id="stm32Action"><option value="IN">IN · 入库</option><option value="OUT">OUT · 出库</option></select></label><label>样本圆盘<select class="select" id="stm32Category"><option value="A">A · 全血</option><option value="B">B · 血清</option><option value="C">C · 血浆</option></select></label><label>圆槽位置<select class="select" id="stm32Position">${[0,1,2,3,4].map(x=>`<option value="${x}">${x} 号</option>`).join('')}</select></label></div><div class="stm32-command"><code id="stm32CommandPreview">IN,A-0</code><button class="btn primary" id="stm32Send" disabled>发送到 STM32</button><button class="btn ghost" id="stm32ClearLog">清空日志</button></div><div class="stm32-log" id="stm32Log"><div>等待连接 CH340…</div></div></div>`;
   $('#motionDeviceMount').append(panel);
   const operations=document.createElement('div');operations.className='panel glass inventory-operations';
-  operations.innerHTML=`<div class="panel-head"><h3>五槽位出入库（0—4）</h3><span class="pill">库存操作</span></div><p class="muted">人工模式由操作人员确认。硬件模式发送机械指令；出库收到机械板 OK 后自动更新库存并释放槽位，入库仍需人工确认样本已放好。</p><div class="android-actions"><select class="select" id="motionMode"><option value="manual">人工模式（不驱动机械）</option><option value="hardware">硬件联调模式</option></select><label>入库目标槽位 <select class="select" id="motionSlot">${[1,2,3,4,5].map(n=>'<option value="'+n+'">'+(n-1)+'</option>').join('')}</select></label><button class="btn ghost" id="bindSlot">绑定已有在库样本槽位</button></div><p id="slotSummary" class="muted"></p><div id="motionTask" class="android-task"></div>`;
+  operations.innerHTML=`<div class="panel-head"><h3>三圆盘出入库（每盘 1—5）</h3><span class="pill">总容量 15</span></div><p class="muted">A-全血、B-血清、C-血浆；入库时按样本类别查询对应圆盘，并自动选择第一个空余位置。</p><div class="storage-visual" id="storageVisual"></div><div class="android-actions"><select class="select" id="motionMode"><option value="manual">人工模式（不驱动机械）</option><option value="hardware">硬件联调模式</option></select><label>样本圆盘 <select class="select" id="motionType">${MotionCore.storageTypes.map(type=>'<option value="'+type+'">'+type+'圆盘</option>').join('')}</select></label><label>入库目标位置（自动） <select class="select" id="motionSlot">${[1,2,3,4,5].map(n=>'<option value="'+n+'">'+n+'</option>').join('')}</select></label><button class="btn ghost" id="bindSlot">绑定已有在库样本槽位</button></div><p id="slotSummary" class="sr-only" aria-live="polite"></p><div id="motionTask" class="android-task"></div>`;
   $('#motionOperationMount').append(operations);
   $('#stm32Action').value='IN';
   $('#stm32Category').value='A';
   $('#stm32Position').value='0';
   $('#motionConnect').onclick=()=>AndroidHost.connect('motion',Number($('#motionBaud').value));
   $('#motionDisconnect').onclick=()=>{if(state.set.motionTask)confirmDialog('断开机械板连接','断开连接不会停止电机；当前任务将保留待核实。请先确认实物状态。',()=>AndroidHost.disconnect('motion'));else AndroidHost.disconnect('motion');};
+  $('#motionType').addEventListener('change',()=>refreshMotionPanel(true));
   for(const id of ['stm32Action','stm32Category','stm32Position'])$('#'+id).addEventListener('input',refreshStm32Console);
   $('#stm32Send').onclick=()=>{
     const command=stm32Command();
     if(!hardware.motion){toast('请先连接 CH340 串口');return;}
-    if(!/^(IN|OUT),[A-H]-[0-4]$/.test(command)){toast('机械指令格式无效');return;}
+    if(!/^(IN|OUT),[A-C]-[0-4]$/.test(command)){toast('机械指令格式无效');return;}
     AndroidHost.send('motion',command);
   };
   $('#stm32ClearLog').onclick=()=>{stm32LogLines.length=0;$('#stm32Log').innerHTML='<div>日志已清空</div>';};
   $('#bindSlot').onclick=()=>{
     if(state.set.motionTask){toast('请先处理当前任务');return;}
     if(!Number($('#motionSlot').value)){toast('没有空闲槽位');return;}
-    const list=Object.values(state.s.samples).filter(x=>x.status==='in');
-    if(!list.length){toast('暂无在库样本');return;}
+    const type=$('#motionType').value;
+    const list=Object.values(state.s.samples).filter(x=>x.status==='in'&&x.type===type);
+    if(!list.length){toast(type+'圆盘暂无可绑定的在库样本');return;}
     const dialog=document.createElement('div');dialog.className='modal-mask open';
-    dialog.innerHTML=`<div class="modal"><div class="modal-head"><h3>绑定实际槽位</h3></div><div class="modal-body"><p>用于迁移的已有在库样本。请人工核对实际位置。</p><select class="select" id="bindSample">${list.map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.code)}</option>`).join('')}</select><p>将绑定到槽位 ${MotionCore.position(Number($('#motionSlot').value))}</p></div><div class="modal-foot"><button class="btn ghost" id="bindCancel">取消</button><button class="btn primary" id="bindConfirm">已核实，绑定</button></div></div>`;
+    dialog.innerHTML=`<div class="modal"><div class="modal-head"><h3>绑定实际槽位</h3></div><div class="modal-body"><p>用于迁移的已有在库样本。请人工核对实际位置。</p><select class="select" id="bindSample">${list.map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.code)}</option>`).join('')}</select><p>将绑定到 ${esc(MotionCore.slotLabel(type,Number($('#motionSlot').value)))}</p></div><div class="modal-foot"><button class="btn ghost" id="bindCancel">取消</button><button class="btn primary" id="bindConfirm">已核实，绑定</button></div></div>`;
     document.body.append(dialog);$('#bindCancel').onclick=()=>dialog.remove();
     $('#bindConfirm').onclick=()=>{
       const id=$('#bindSample').value,slot=Number($('#motionSlot').value);
-      if(!MotionCore.slotFree(state.s.samples,slot,id)){toast('槽位已被占用');return;}
-      state.s.samples[id].slot=slot;state.s.samples[id].loc='圆盘-'+MotionCore.position(slot);
-      state.rec.unshift({time:FMT.now(),sample:state.s.samples[id].name,sampleId:id,code:state.s.samples[id].code||null,slot,status:'in',type:'槽位绑定',detail:'人工核实：圆盘-'+MotionCore.position(slot)});
+      if(!MotionCore.slotFree(state.s.samples,type,slot,id)){toast(type+'圆盘的该槽位已被占用');return;}
+      state.s.samples[id].slot=slot;state.s.samples[id].loc=MotionCore.slotLabel(type,slot);
+      state.rec.unshift({time:FMT.now(),sample:state.s.samples[id].name,sampleId:id,code:state.s.samples[id].code||null,slot,status:'in',type:'槽位绑定',detail:'人工核实：'+MotionCore.slotLabel(type,slot)});
       if(!saveAll())return;
       dialog.remove();reloadUI();toast('已绑定');
     };
   };
-  const scannerActions=document.createElement('div');scannerActions.className='scanner-actions';scannerActions.id='scannerActions';$('#view-library').prepend(scannerActions);
+  const scannerActions=document.createElement('div');scannerActions.className='scanner-actions';scannerActions.id='scannerActions';$('#libraryListPane').prepend(scannerActions);
   for(const id of ['resetBtn','importBtn'])$('#'+id).addEventListener('click',e=>{if(state.set.motionTask){e.preventDefault();e.stopImmediatePropagation();toast('请先处理当前出入库任务');}},true);
   $('#simStartBtn').addEventListener('click',e=>{if(hardware.sensor){e.stopImmediatePropagation();toast('请先断开真实温控设备再模拟');}},true);
-  $('#buildTag').textContent='Android 1.10.0 · 出入库独立';
+  $('#buildTag').textContent='Android 1.18.2 · 人工出库免扫码';
   if(state.set.motionTask)persistTask({...state.set.motionTask,phase:'uncertain',error:'应用重新启动，请人工核实上次操作；不会自动重发指令'});
   renderTask();
   refreshStm32Console();

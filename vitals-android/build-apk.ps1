@@ -5,5 +5,5 @@ try {
     & .\gradlew.bat assembleDebug
     if ($LASTEXITCODE -ne 0) { throw 'APK build failed' }
     New-Item -ItemType Directory -Force .\output | Out-Null
-    Copy-Item .\app\build\outputs\apk\debug\app-debug.apk .\output\Vitals-Android-1.10.0.apk
+    Copy-Item .\app\build\outputs\apk\debug\app-debug.apk .\output\Vitals-Android-1.18.2.apk
 } finally { Pop-Location }

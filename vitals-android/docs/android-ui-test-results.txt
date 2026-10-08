@@ -1,0 +1,2 @@
+PASS: Android startup, SQLite, native revision conflict recovery during feedback/completion, zero temperature limit and invalid bounds, manual in/out, wrong-scan rejection, simulated ACK/arrival, sensor validation, unfinished-task recovery, import, no-device feedback.
+/sdcard/vitals-test.png: 1 file pulled, 0 skipped. 18.3 MB/s (184936 bytes in 0.010s)

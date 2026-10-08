@@ -5,7 +5,7 @@ function processScannerCode(raw,mode,context){
   if(mode==='verify')return verifyOutboundScanner(raw,context);
   const sample=Object.values(state.s.samples).find(x=>x.code===code||x.id===code);
   if(mode==='scan'){
-    if(!sample)return {ok:false,message:'未找到编号“'+code+'”对应的样本，请使用“扫码枪录入样本”'};
+    if(!sample)return {ok:false,message:'未找到编号“'+code+'”对应的样本，请先打开“录入样本”，再扫描样本编号'};
     openDetail(sample.id);return {ok:true,message:'已识别样本：'+sample.name};
   }
   if(state.set.motionTask)return {ok:false,message:'请先处理当前出入库任务，再录入样本'};
@@ -58,10 +58,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   const deviceActions=$('#scannerDeviceActions'),actions=$('#scannerActions');
   deviceActions.innerHTML='<div class="scanner-connect glass"><div><b>得力 AA307 二维条码扫描器</b><p>USB 虚拟串口模式 · 自动按一次完整扫描接收数据</p></div><span class="pill" id="scannerConnection">未检测到扫码枪</span><button class="btn primary" id="scannerConnect">连接扫码枪</button><button class="btn ghost hidden" id="scannerDisconnect">断开扫码枪</button></div>';
-  actions.innerHTML='<div class="scanner-buttons"><button class="btn ghost" id="scannerQuery">扫码枪查询样本</button><button class="btn primary" id="scannerNew">扫码枪录入样本</button></div>';
+  actions.innerHTML='<div class="scanner-buttons"><button class="btn ghost" id="scannerQuery">扫码枪查询样本</button></div>';
   $('#scannerConnect').onclick=()=>AndroidHost.connect('scanner',115200);
   $('#scannerDisconnect').onclick=()=>AndroidHost.disconnect('scanner');
-  $('#scannerQuery').onclick=()=>open('scan');$('#scannerNew').onclick=()=>open('new');
+  $('#scannerQuery').onclick=()=>open('scan');
   const fill=document.createElement('button');fill.id='scannerFillCode';fill.type='button';fill.className='btn ghost';fill.textContent='扫码枪扫描编号';fill.onclick=()=>open('fill',editingId);$('#fCode').after(fill);
   refreshScannerConnection();
 });

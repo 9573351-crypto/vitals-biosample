@@ -21,7 +21,7 @@ public final class DatabaseInstrumentation extends Instrumentation {
     private void yes(boolean b){if(!b)throw new AssertionError("expected true");}
     private void fails(Check c)throws Exception{boolean failed=false;try{c.run();}catch(Exception e){failed=true;}yes(failed);}
     private String fresh(){String n="vitals-refactor-test-"+(++sequence)+".db";getTargetContext().deleteDatabase(n);names.add(n);return n;}
-    private JSONObject sample(String id,String code)throws Exception{return new JSONObject().put("id",id).put("name","样本 "+id).put("code",code).put("status","out").put("temp",4.2).put("createdAt",123456789L).put("updatedAt",123456790L).put("photo","data:image/jpeg;base64,YWJj").put("qrSnap","旧二维码快照").put("env",new JSONArray().put(new JSONObject().put("time","2026-09-14 12:00").put("temp",4.2))).put("customField",new JSONObject().put("keep",true));}
+    private JSONObject sample(String id,String code)throws Exception{return new JSONObject().put("id",id).put("name","样本 "+id).put("code",code).put("type","全血").put("status","out").put("temp",4.2).put("createdAt",123456789L).put("updatedAt",123456790L).put("photo","data:image/jpeg;base64,YWJj").put("qrSnap","旧二维码快照").put("env",new JSONArray().put(new JSONObject().put("time","2026-09-14 12:00").put("temp",4.2))).put("customField",new JSONObject().put("keep",true));}
     private JSONObject rec(String id)throws Exception{return new JSONObject().put("sampleId",id).put("sample","名称快照").put("time","2026-09-14 12:00").put("type","录入").put("detail","记录内容");}
     private JSONObject backup(JSONObject sample)throws Exception{return new JSONObject().put("samples",new JSONObject().put(sample.getString("id"),sample)).put("records",new JSONArray()).put("settings",new JSONObject().put("hi",8).put("lo",-88).put("custom",new JSONObject().put("keep",1)));}
     private String canonical(JSONObject b)throws Exception{
@@ -55,7 +55,7 @@ public final class DatabaseInstrumentation extends Instrumentation {
         });
         String name=fresh();VitalsDbHelper h=new VitalsDbHelper(getTargetContext(),name);
         test("new empty database, version and foreign keys",()->{
-            eq(h.getSamples().length(),0);eq(h.getRecords(null).length(),0);eq(h.info().getInt("version"),2);
+            eq(h.getSamples().length(),0);eq(h.getRecords(null).length(),0);eq(h.info().getInt("version"),3);
             try(Cursor c=h.getReadableDatabase().rawQuery("PRAGMA foreign_keys",null)){c.moveToFirst();eq(c.getInt(0),1);}
         });
         test("create sample plus linked record",()->{h.saveSample(sample("A","CODE-A"),rec("A"));eq(h.getRecords("A").length(),1);eq(h.getSample("A",false).getString("code"),"CODE-A");});
@@ -65,6 +65,7 @@ public final class DatabaseInstrumentation extends Instrumentation {
         test("status and field types",()->{fails(()->h.saveSample(sample("B","B").put("status","pending"),null));fails(()->h.saveSample(sample("B","B").put("monitor","yes"),null));fails(()->h.saveSample(sample("B","B").put("temp","4"),null));});
         test("inbound atomic with history",()->{JSONObject a=h.getSample("A",false).put("status","in").put("slot",1);h.saveSample(a,rec("A").put("type","入库").put("slot",1));eq(h.getRecords("A").length(),2);eq(h.getSample("A",false).getInt("slot"),1);});
         test("occupied slot rejects second sample",()->{fails(()->h.saveSample(sample("B","B").put("status","in").put("slot",1),null));eq(h.getSamples().length(),1);});
+        test("same slot number is allowed on another sample disc",()->{h.saveSample(sample("SERUM","SERUM").put("type","血清").put("status","in").put("slot",1),null);eq(h.getSample("SERUM",false).getInt("slot"),1);});
         test("record failure rolls sample update back",()->{JSONObject a=h.getSample("A",false).put("name","不应保存");fails(()->h.saveSample(a,rec("MISSING")));eq(h.getSample("A",false).getString("name"),"改名");eq(h.getRecords("A").length(),2);});
         test("outbound frees slot with retained last slot",()->{JSONObject a=h.getSample("A",false).put("status","out");h.saveSample(a,rec("A").put("type","出库"));yes(!h.getSample("A",false).has("slot"));eq(h.getSample("A",false).getInt("lastSlot"),1);h.saveSample(sample("B","B").put("status","in").put("slot",1),null);});
         test("settings JSON values and read",()->{h.setSetting("hi",9.5);h.setSetting("custom",new JSONObject().put("a",1));eq(h.getSettings().getDouble("hi"),9.5);eq(h.getSettings().getJSONObject("custom").getInt("a"),1);});

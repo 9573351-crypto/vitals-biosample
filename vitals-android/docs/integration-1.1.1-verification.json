@@ -1,0 +1,16 @@
+{
+  "OriginalChanged": [],
+  "Styles": [
+    {
+      "Name": "styles.css",
+      "Unchanged": true
+    },
+    {
+      "Name": "android.css",
+      "Unchanged": true
+    }
+  ],
+  "Apk": "D:\\sx\\system\\vitals-android\\output\\Vitals-Android-1.1.1.apk",
+  "Bytes": 1451142,
+  "SHA256": "0C212BBEF3AE2F1A038A3E790F9308BC5CB43A5885B5A6E495E5991DC24145C2"
+}

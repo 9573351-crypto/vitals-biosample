@@ -6,8 +6,11 @@ import android.content.*;
 import android.database.sqlite.SQLiteDatabase;
 import android.hardware.usb.*;
 import android.net.Uri;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.print.PrintManager;
 import android.webkit.*;
+import androidx.core.content.FileProvider;
 import android.util.Log;
 import org.json.*;
 import java.io.*;
@@ -20,6 +23,10 @@ import com.hoho.android.usbserial.driver.*;
 public class MainActivity extends Activity {
     private static final String ORIGIN = "https://appassets.androidplatform.net/";
     private static final String USB_PERMISSION = "com.vitals.android.USB_PERMISSION";
+    private static final int REQ_EXPORT = 1;
+    private static final int REQ_IMPORT = 2;
+    private static final int REQ_PHOTO = 3;
+    private static final int REQ_INSTALL_PERMISSION = 4;
     private WebView web;
     private SQLiteDatabase db;
     private VitalsDbHelper dbHelper;
@@ -34,6 +41,8 @@ public class MainActivity extends Activity {
     private String exportContent;
     private ValueCallback<Uri[]> files;
     private volatile boolean destroyed;
+    private volatile boolean updateBusy;
+    private volatile String pendingInstallPath;
 
     @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag") // pre-33 branch is protected by our signature permission; 33+ explicitly NOT_EXPORTED.
     @Override public void onCreate(Bundle saved) {
@@ -104,6 +113,94 @@ public class MainActivity extends Activity {
         if(destroyed) return;
         runOnUiThread(() -> { if(!destroyed) web.evaluateJavascript("window.onAndroidEvent && window.onAndroidEvent("+JSONObject.quote(type)+","+JSONObject.quote(role)+","+JSONObject.quote(text)+")", null); });
     }
+    /** 更新状态统一以 update 事件回传，状态正文经 JSON 序列化，避免引号破坏 JS 语法。 */
+    private void updateEvent(String status, JSONObject extra) {
+        try {
+            JSONObject payload = new JSONObject().put("status", status);
+            if (extra != null) {
+                for (Iterator<String> it = extra.keys(); it.hasNext(); ) { String k = it.next(); payload.put(k, extra.get(k)); }
+            }
+            event("update", "", payload.toString());
+        } catch (JSONException ignored) { }
+    }
+    private void checkUpdateAsync() {
+        if (updateBusy) { updateEvent("busy", null); return; }
+        if (destroyed) { updateEvent("error", updateMessage("应用已关闭")); return; }
+        updateBusy = true;
+        updateEvent("checking", null);
+        io.execute(() -> {
+            try {
+                updateEvent("checked", VitalsUpdater.check(this, BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME));
+            } catch (Exception e) {
+                updateEvent("error", updateMessage(e.getMessage() == null ? "检查更新失败" : e.getMessage()));
+            } finally {
+                updateBusy = false;
+            }
+        });
+    }
+    private void downloadUpdateAsync(String tag, long size, String sha256) {
+        if (updateBusy) { updateEvent("busy", null); return; }
+        if (tag == null || tag.isEmpty()) { updateEvent("error", updateMessage("没有可用的版本标签，请先检查更新")); return; }
+        updateBusy = true;
+        try {
+            updateEvent("downloading", new JSONObject().put("total", size));
+        } catch (JSONException ignored) { }
+        io.execute(() -> {
+            try {
+                // 只信任 tag：安装包地址由原生重新解析，并再次通过域名白名单校验。
+                VitalsUpdater.Release release = VitalsUpdater.resolve(tag);
+                File apk = VitalsUpdater.download(this, release.apkUrl, release.apkSize > 0 ? release.apkSize : size, release.sha256 != null ? release.sha256 : sha256, (downloaded, total) -> {
+                    try {
+                        updateEvent("progress", new JSONObject().put("downloaded", downloaded).put("total", total).put("percent", total > 0 ? (int) (downloaded * 100 / total) : -1)
+                                .put("percentText", total > 0 ? (downloaded * 100 / total) + "%" : humanSize(downloaded)));
+                    } catch (JSONException ignored) { }
+                    return !destroyed;
+                });
+                pendingInstallPath = VitalsUpdater.verifyApk(this, apk);
+                try {
+                    updateEvent("downloaded", new JSONObject().put("name", apk.getName()).put("size", apk.length()).put("sizeText", humanSize(apk.length())));
+                } catch (JSONException ignored) { }
+            } catch (Exception e) {
+                updateEvent("error", updateMessage(e.getMessage() == null ? "下载更新失败" : e.getMessage()));
+            } finally {
+                updateBusy = false;
+            }
+        });
+    }
+    private void installUpdateAsync() {
+        String path = pendingInstallPath;
+        if (path == null) { updateEvent("error", updateMessage("请先下载更新包")); return; }
+        runOnUiThread(() -> beginInstall(path));
+    }
+    /** 交系统安装器处理新版本；未授予「安装未知应用」权限时先引导到系统设置。 */
+    private void beginInstall(String path) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getPackageManager().canRequestPackageInstalls()) {
+            pendingInstallPath = path;
+            updateEvent("permissionRequired", updateMessage("请在系统中允许本应用安装未知应用，返回后会自动继续"));
+            try {
+                startActivityForResult(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())), REQ_INSTALL_PERMISSION);
+            } catch (Exception e) {
+                updateEvent("error", updateMessage("无法打开安装权限设置页：" + e.getMessage()));
+            }
+            return;
+        }
+        updateEvent("installing", null);
+        try {
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", new File(path));
+            startActivity(new Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+        } catch (Exception e) {
+            Log.e("VitalsUpdate", "install failed", e);
+            updateEvent("error", updateMessage("无法启动系统安装器：" + e.getMessage()));
+        }
+    }
+    private static String humanSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format(Locale.ROOT, "%.1f KB", bytes / 1024.0);
+        return String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+    private static JSONObject updateMessage(String text) {
+        try { return new JSONObject().put("message", text); } catch (JSONException impossible) { return new JSONObject(); }
+    }
     private String externalDevicesJson() {
         int scanners=0,printers=0;
         for(UsbDevice device:usb.getDeviceList().values()) {
@@ -141,6 +238,10 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String importBackup(String payload){return databaseCall(() -> dbHelper.replaceBackup(payload));}
         @JavascriptInterface public String getBackup(){return databaseCall(() -> dbHelper.exportBackup());}
         @JavascriptInterface public String getExternalDevices(){return externalDevicesJson();}
+        @JavascriptInterface public String getAppVersion(){try{return new JSONObject().put("version",BuildConfig.VERSION_NAME).put("versionCode",BuildConfig.VERSION_CODE).put("repo",VitalsUpdater.REPO).toString();}catch(JSONException impossible){return "{}";}}
+        @JavascriptInterface public void checkUpdate(){checkUpdateAsync();}
+        @JavascriptInterface public void downloadUpdate(String tag,long size,String sha256){downloadUpdateAsync(tag,size,sha256);}
+        @JavascriptInterface public void installUpdate(){installUpdateAsync();}
         @JavascriptInterface public void exportJson(String filename,String content) {
             runOnUiThread(() -> {
                 if(exportContent!=null) { event("export","","已有导出窗口，请先完成或取消"); return; }
@@ -287,8 +388,16 @@ public class MainActivity extends Activity {
             new Handler(Looper.getMainLooper()).postDelayed(() -> notifyExternalDevices(),250);
         }
     };
+    @android.annotation.SuppressLint({"MissingSuperCall","Deprecated"}) // 沿用既有的 requestCode 文件流程
     @Override protected void onActivityResult(int req,int result,Intent data) {
         super.onActivityResult(req,result,data);
+        // 从「安装未知应用」权限设置页返回：只有用户真的开启了权限才继续安装。
+        if (req == REQ_INSTALL_PERMISSION) {
+            String path = pendingInstallPath;
+            if (path != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && getPackageManager().canRequestPackageInstalls()) { beginInstall(path); }
+            else { pendingInstallPath = null; updateEvent("cancelled", updateMessage("未授予安装权限，更新已暂停；可稍后再次点击「一键更新」")); }
+            return;
+        }
         if(req==3) { if(files!=null){files.onReceiveValue(result==RESULT_OK && data!=null?new Uri[]{data.getData()}:null);files=null;}return; }
         if(result!=RESULT_OK || data==null || data.getData()==null) {if(req==1)exportContent=null;event("info","","已取消文件操作");return;}
         Uri uri=data.getData(); String content=exportContent; if(req==1)exportContent=null;

@@ -8,8 +8,9 @@
      导出 / 导入                           → 浏览器下载 / 文件选择
    数据全部保存在本机浏览器的 localStorage（键 vitals.preview.db），与安卓版互不影响。 */
 (function (global) {
-  const BUILD = 'web-preview-20260928a';
+  const BUILD = 'web-preview-20261008a';
   const DB_KEY = 'vitals.preview.db';
+  const REPO_SLUG = '9573351-crypto/vitals-biosample';
   const ROLES = { sensor: '温控串口', motion: '机械板', scanner: '扫码枪' };
   const CHANGE_FIELDS = ['expectedRevision', 'upsertSamples', 'deleteSamples', 'addRecords', 'deleteRecords', 'setSettings', 'deleteSettings'];
   const connected = { sensor: false, motion: false, scanner: false };
@@ -210,6 +211,38 @@
       emit('sent', role, text);
       // 模拟 CH340 机械板收到指令后回一个到位 OK；硬件模式下的出库任务会据此自动完成。
       if (role === 'motion') setTimeout(() => { if (connected.motion) emit('line', 'motion', 'ok'); }, 900);
+    },
+
+    /* ---- 更新（网页预览：只读查询 GitHub，不具备安装能力） ---- */
+    getAppVersion() { return j({ version: '1.18.2', versionCode: 30, repo: REPO_SLUG, simulated: true }); },
+    checkUpdate() {
+      try {
+        const url = 'https://api.github.com/repos/' + REPO_SLUG + '/releases/latest';
+        fetch(url, { headers: { Accept: 'application/vnd.github+json' } }).then(response => {
+          if (response.status === 404) { emit('update', '', j({ status: 'checked', ok: true, hasUpdate: false, latestVersion: '1.18.2', message: '仓库尚未发布任何版本' })); return null; }
+          if (!response.ok) throw new Error('GitHub 返回错误：HTTP ' + response.status);
+          return response.json();
+        }).then(release => {
+          if (!release) return;
+          const tag = String(release.tag_name || '').replace(/^[vV]/, '');
+          const asset = (release.assets || []).filter(a => /\.apk$/i.test(a.name || ''))[0] || null;
+          emit('update', '', j({
+            status: 'checked', ok: true, hasUpdate: false, latestVersion: tag || '1.18.2',
+            tag: release.tag_name || '', notes: release.body || '', pageUrl: release.html_url || '',
+            publishedAt: release.published_at || '', apkName: asset ? asset.name : '', apkSize: asset ? asset.size : 0,
+            hasApk: !!asset, port: 'web', message: '网页预览版只提示版本，不会下载或安装'
+          }));
+        }).catch(error => {
+          emit('update', '', j({ status: 'error', ok: false, message: (error && error.message) || '检查更新失败' }));
+        });
+      } catch (e) { emit('update', '', j({ status: 'error', ok: false, message: (e && e.message) || '检查更新失败' })); }
+    },
+    downloadUpdate() { emit('update', '', j({ status: 'error', ok: false, message: '网页预览版不支持下载安装包，请在 Android 应用内使用一键更新' })); },
+    installUpdate() { emit('update', '', j({ status: 'error', ok: false, message: '网页预览版不支持安装，请在 Android 应用内使用一键更新' })); },
+    openUrl(url) {
+      const text = String(url == null ? '' : url);
+      if (!/^https:\/\/github\.com\//.test(text)) { emit('error', '', '只允许打开 GitHub 地址'); return; }
+      global.open(text, '_blank');
     },
 
     /* ---- 文件 ---- */

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 内置更新下载的安装包存放于 files/updates/，由系统安装器通过 FileProvider 读取 -->
+    <files-path name="updates" path="updates/"/>
+</paths>

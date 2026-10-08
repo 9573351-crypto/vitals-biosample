@@ -4,12 +4,20 @@
 local.properties
 captures/
 .cxx/
-output/
 *.apk
 *.aab
 *.ap_
 *.dex
 *.class
+# 例外：schema 重构文档引用的旧版基线安装包（体积约 1.4MB，用于复现迁移对比）
+!vitals-android/docs/schema-refactor-baseline/legacy.apk
+
+# ===== 仓库里的临时目录与原始发布包 =====
+.backup-*/
+.staging-*/
+*.zip
+*.7z
+*.rar
 
 # ===== IDE =====
 .idea/

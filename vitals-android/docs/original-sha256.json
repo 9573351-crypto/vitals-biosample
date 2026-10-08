@@ -1,0 +1,54 @@
+[
+  {
+    "Path": "D:\\sx\\system\\code\\code\\_check_index.html",
+    "Hash": "EE358D2CA503D64550905DBF83332E69730D5ADC29D30084E62F7FE049871245"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\_check_styles.css",
+    "Hash": "3B54292F60762212C466D04E3330C2213098EFFCB9655E84D08F0394B85BAA06"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\.gitignore",
+    "Hash": "837B19EA5144179B0903986D0316886B800B9540D56ED902FE72D4DDB4A1A17E"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\启动生物样本库.bat",
+    "Hash": "D292B2CE28983F5762899E235AE70CD817519387D73654AE9C80C2BFE9998701"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\app.js",
+    "Hash": "5F7E4DC823472245864A469C994D20B2A02F3BC25128F5ACE29AF2AFE9449F20"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\index.html",
+    "Hash": "7CDCAA1D2B69A44B7D9F045D475A6F543C8B3A678DB507EFBAE4351001CB5E8B"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\main.js",
+    "Hash": "5F4105D8E0CB52767B403A362A7B00A793FF92D4FF09FACC39813CBFEFAFB5B8"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\package-lock.json",
+    "Hash": "1A53258593D279F2F9BC502BE676D6CC5CA1D7C1A122F9C34B62E3EED6CB3BFA"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\package.json",
+    "Hash": "A5E13C1ADFE66814042FE4A8D1949424B3FD224C3108DF1B1FB1CF287124C6DE"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\preload.js",
+    "Hash": "7BDEE382FDF69C422A4C800EC185E54978BB45BA83BC5139D322504368EB5125"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\README.md",
+    "Hash": "9046B943253DE1BC168C687DD2E56B6FF0646406506329AA6BD371B574F77F89"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\server.js",
+    "Hash": "6F88B6A880A49E55C947C2BDB8EB8E09FBD0CF402614005489869FD1E4FAD164"
+  },
+  {
+    "Path": "D:\\sx\\system\\code\\code\\styles.css",
+    "Hash": "3B54292F60762212C466D04E3330C2213098EFFCB9655E84D08F0394B85BAA06"
+  }
+]

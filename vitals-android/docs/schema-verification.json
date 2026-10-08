@@ -1,0 +1,93 @@
+{
+  "originalFiles": 13,
+  "originalCurrentFiles": 13,
+  "originalChanged": [],
+  "stylesUnchanged": {
+    "app/src/main/assets/web/styles.css": true,
+    "app/src/main/assets/web/android.css": true
+  },
+  "schemaVersion": 2,
+  "apk": "D:\\sx\\system\\vitals-android\\output\\Vitals-Android-1.1.0.apk",
+  "apkBytes": 1452574,
+  "apkSHA256": "af2560daa82794f2b1b18735c9fa45a6f5903b3ddffbb6414cabe4517e6fa11e",
+  "sameSigningCertificate": true,
+  "nativeDatabaseTestsPassed": 25,
+  "coreTestsPassed": 6,
+  "browserUi": "passed",
+  "androidUi": "passed",
+  "lint": "passed with warnings",
+  "changes": [
+    {
+      "path": "app/src/main/java/com/vitals/android/MainActivity.java",
+      "status": "modified"
+    },
+    {
+      "path": "app/src/main/java/com/vitals/android/VitalsDbHelper.java",
+      "status": "added"
+    },
+    {
+      "path": "app/src/main/assets/web/persistence.js",
+      "status": "added"
+    },
+    {
+      "path": "app/src/main/assets/web/app.js",
+      "status": "modified"
+    },
+    {
+      "path": "app/src/main/assets/web/android.js",
+      "status": "modified"
+    },
+    {
+      "path": "app/src/main/assets/web/motion-core.js",
+      "status": "modified"
+    },
+    {
+      "path": "app/src/main/assets/web/index.html",
+      "status": "modified"
+    },
+    {
+      "path": "app/src/androidTest/java/com/vitals/android/DatabaseInstrumentation.java",
+      "status": "added"
+    },
+    {
+      "path": "app/build.gradle",
+      "status": "modified"
+    },
+    {
+      "path": "build-apk.ps1",
+      "status": "modified"
+    },
+    {
+      "path": "README.md",
+      "status": "modified"
+    },
+    {
+      "path": "tools/test-core.cjs",
+      "status": "modified"
+    },
+    {
+      "path": "tools/test-ui.cjs",
+      "status": "modified"
+    },
+    {
+      "path": "tools/test-android.cjs",
+      "status": "modified"
+    },
+    {
+      "path": "tools/mock-bridge.js",
+      "status": "added"
+    },
+    {
+      "path": "tools/test-db.ps1",
+      "status": "added"
+    },
+    {
+      "path": "tools/test-android-preserved.cjs",
+      "status": "added"
+    },
+    {
+      "path": "tools/refactor-persistence.cjs",
+      "status": "added"
+    }
+  ]
+}

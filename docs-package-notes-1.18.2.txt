@@ -1,0 +1,20 @@
+﻿生息样本库 1.18.2 · 源代码及安卓安装包
+
+安装包：vitals-android/output/Vitals-Android-1.18.2.apk
+源代码：vitals-android/app/src（包含原生代码、网页资源和测试源码）
+构建配置、Gradle Wrapper、测试工具及项目文档均随包提供。
+未包含构建缓存、临时日志、本机 SDK 路径配置和旧版本 APK。
+
+版本：1.18.2，versionCode 30，包名 com.vitals.android。
+APK 使用现有开发测试签名。已通过构建、10 项核心测试、界面回归及 APK 签名校验。
+
+重新构建：
+1. 安装 JDK 17 或兼容 JDK、Android SDK（compileSdk 36）。
+2. 在 vitals-android/local.properties 中配置本机 sdk.dir。
+3. 将 build-apk.ps1 中 JAVA_HOME 改为本机 JDK 路径。
+4. 在 vitals-android 目录运行：
+   powershell -ExecutionPolicy Bypass -File .\build-apk.ps1
+首次构建需下载 Gradle 及依赖。详细环境要求见项目 README.md。
+
+说明：签名私钥未包含在源码包中。其他电脑自行构建会使用该电脑的调试签名，
+可能无法覆盖安装此 APK；覆盖升级需使用相同签名。卸载会清除本机应用数据，请先导出。

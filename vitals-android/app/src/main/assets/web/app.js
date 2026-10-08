@@ -89,12 +89,16 @@ function addRecord(sampleName, type, detail, sampleId=null, persist=true){
 
 /* ==================== 导航 ==================== */
 const VIEW_TITLES = {
-  dashboard:'概览', library:'样本库', inventory:'出入库', devices:'设备连接', monitor:'实时监测', records:'动态记录', settings:'设置'
+  dashboard:'概览', library:'样本库', devices:'设备连接', monitor:'实时监测', records:'动态记录', settings:'设置'
 };/*页面名称映射：英文转中文*/
 $$('.nav-item[data-view]').forEach(btn => {
   btn.addEventListener('click', () => goView(btn.dataset.view));
 });
 function goView(name){
+  if(name==='inventory'){
+    name='library';
+    switchLibraryPane('inventory');
+  }
   $$('.nav-item[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
   $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
   $('#pageTitle').textContent = VIEW_TITLES[name] || '';
@@ -106,6 +110,22 @@ function goView(name){
   if(name==='settings') fillSettings();
   if(name==='monitor'){ ensureMonitorRefresh(); ensureMonitorSel(); renderRack(); renderMonitorCharts(); }
 }
+function switchLibraryPane(name){
+  const selected=name==='inventory'?'inventory':'list';
+  $$('.library-tab').forEach(tab=>{
+    const active=tab.dataset.libraryPane===selected;
+    tab.classList.toggle('active',active);
+    tab.setAttribute('aria-selected',String(active));
+  });
+  $$('.library-pane').forEach(pane=>{
+    const active=pane.id===(selected==='inventory'?'libraryInventoryPane':'libraryListPane');
+    pane.classList.toggle('active',active);
+    pane.hidden=!active;
+  });
+  if(selected==='list')renderLibrary();
+  if(selected==='inventory'&&window.renderTask)window.renderTask();
+}
+$$('.library-tab').forEach(tab=>tab.addEventListener('click',()=>switchLibraryPane(tab.dataset.libraryPane)));
 $$('.text-btn[data-go]').forEach(b => b.addEventListener('click', () => goView(b.dataset.go)));
 $('#deviceOnlineCard').addEventListener('click',()=>goView('devices'));
 $('#deviceOnlineCard').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goView('devices');}});
@@ -324,6 +344,27 @@ function setDefaultTime(){
 /* ==================== 录入弹窗 ==================== */
 let modalPhoto = null;
 
+function sampleSlotTaken(type,slot,exceptId=null){
+  return Object.values(state.s.samples).some(x=>x.id!==exceptId&&x.type===type&&(
+    x.status!=='out'&&x.slot===slot || x.status==='out'&&x.plannedSlot===slot
+  ));
+}
+function refreshSampleSlotOptions(preferred){
+  const select=$('#fSlot');if(!select)return;
+  const type=$('#fType').value,current=editingId&&state.s.samples[editingId];
+  const desired=Number(preferred??(current?.status==='in'?current.slot:current?.plannedSlot));
+  const available=[];select.replaceChildren();
+  for(let slot=1;slot<=5;slot++){
+    const taken=sampleSlotTaken(type,slot,editingId),option=document.createElement('option');
+    option.value=slot;option.disabled=taken;option.textContent=slot+' 号 · '+(taken?'已占用或已预选':'空闲');
+    select.append(option);if(!taken)available.push(slot);
+  }
+  select.value=String(available.includes(desired)?desired:available[0]||'');
+  select.disabled=current?.status==='in'||!available.length;
+  if(!available.length){const option=document.createElement('option');option.value='';option.textContent='暂无空余位置';option.disabled=true;select.replaceChildren(option);}
+  updateBarcodePreview($('#fCode').value);
+}
+
 function openModal(id){
   if(state.set.motionTask){toast("请先处理当前出入库任务");return;}
   editingId = id || null;
@@ -336,7 +377,7 @@ function openModal(id){
       $('#fName').value = x.name || '';
       $('#fCode').value = x.code || '';
       $('#fType').value = x.type || '全血';
-      $('#fLoc').value = x.loc || '';
+      refreshSampleSlotOptions(x.status==='in'?x.slot:x.plannedSlot);
       $('#fTime').value = x.timeRaw || (x.time?dateToLocal(x.time): '');
       $('#fTemp').value = x.temp != null ? x.temp : '';
       $('#fNote').value = x.note || '';
@@ -347,7 +388,8 @@ function openModal(id){
   } else {
     $('#fCode').value = '';
     $('#fTemp').value = '';
-    $('#fName').value=''; $('#fLoc').value=''; $('#fNote').value=''; $('#fType').value='全血';
+    $('#fName').value=''; $('#fNote').value=''; $('#fType').value='全血';
+    refreshSampleSlotOptions();
     modalPhoto = null; setPhotoPreview();
     updateBarcodePreview('');
   }
@@ -378,6 +420,8 @@ $('#fName').addEventListener('input', () => {
   }
 });
 $('#fCode').addEventListener('input', ()=> updateBarcodePreview($('#fCode').value));
+$('#fType').addEventListener('change', ()=>refreshSampleSlotOptions());
+$('#fSlot').addEventListener('change', ()=>updateBarcodePreview($('#fCode').value));
 
 function updateBarcodePreview(code){
   const box = $('#barcodePreview');
@@ -388,7 +432,7 @@ function updateBarcodePreview(code){
     const tempVal = $('#fTemp').value;
     renderQR(box, sampleInfoCard({
       name: $('#fName').value.trim(), code, type: $('#fType').value,
-      loc: $('#fLoc').value.trim(), status:'in',
+      loc: Number($('#fSlot').value)?MotionCore.slotLabel($('#fType').value,Number($('#fSlot').value)):'待分配', status:'in',
       temp: tempVal !== '' ? parseFloat(tempVal) : null,
       timeTxt: FMT.now(), note: $('#fNote').value.trim()
     }), 2, 2);
@@ -449,12 +493,17 @@ $('#modalSave').addEventListener('click', ()=>{
   const name = $('#fName').value.trim();
   let code = $('#fCode').value.trim();
   const type = $('#fType').value;
-  const loc = $('#fLoc').value.trim();
+  const plannedSlot = Number($('#fSlot').value);
   const timeRaw = $('#fTime').value;
   const timeTxt = timeRaw ? FMT.time(timeRaw) : FMT.now();
   const temp = $('#fTemp').value !== '' ? parseFloat($('#fTemp').value) : null;
   const note = $('#fNote').value.trim();
   if(!name){ shakeField('#fName'); $('#fName').focus(); return; }
+  if(!MotionCore.storageTypes.includes(type)){toast('当前只支持全血、血清、血浆三类样本');return;}
+  const current=editingId&&state.s.samples[editingId],currentIn=current?.status==='in';
+  if(!currentIn&&(!Number.isInteger(plannedSlot)||plannedSlot<1||plannedSlot>5||sampleSlotTaken(type,plannedSlot,editingId))){toast('该圆盘没有可用位置，请先完成出库或选择其他空位');refreshSampleSlotOptions();return;}
+  const effectiveSlot=currentIn?current.slot:plannedSlot;
+  const loc=MotionCore.slotLabel(type,effectiveSlot);
   if(!code){ code = 'SB-' + Date.now().toString(36).toUpperCase(); }
   // 编号唯一性
   const dup = Object.values(state.s.samples).find(x => x.code===code && x.id!==editingId);
@@ -463,14 +512,16 @@ $('#modalSave').addEventListener('click', ()=>{
   const now = Date.now();
   if(editingId){
     const x = state.s.samples[editingId];
+    if(x.status==='in'&&x.type!==type){toast('在库样本不能更换圆盘类型，请先完成出库');return;}
     Object.assign(x, { name, code, type, loc, timeRaw, timeTxt, temp, note, photo: modalPhoto, updatedAt: now });
+    if(x.status==='out')x.plannedSlot=plannedSlot;else delete x.plannedSlot;
     addRecord(name, '编辑', `更新样本「${name}」信息`, editingId, false);
   } else {
     const id = uid();
     const sample = {
       id, name, code, type, loc, timeRaw, timeTxt, temp, note,
       photo: modalPhoto, createdAt: now, updatedAt: now,
-      monitor: false, lastTemp: temp, alert:'good', lastUpdate:null, status:'out', pendingIntake:true
+      monitor: false, lastTemp: temp, alert:'good', lastUpdate:null, status:'out', pendingIntake:true, plannedSlot
     };
     sample.qrSnap = sampleInfoCard(sample); // 创建时冻结二维码快照，此后编辑/温度变化不再改动
     state.s.samples[id] = sample;
@@ -717,43 +768,33 @@ function tempSerialLog(raw,kind='rec'){
 }
 
 /* ==================== 传感器噪声处理（EMA 平滑 + 去抖 + 告警记录冷却） ==================== */
-const EMA_ALPHA = 0.3;           /* EMA 平滑系数 */
-const DEBOUNCE_COUNT = 5;        /* 连续采样确认次数 */
-const ALERT_COOLDOWN_MS = 10000; /* 告警记录冷却时间(ms) */
+const EMA_ALPHA = 0.3;
+const DEBOUNCE_COUNT = 5;
+const ALERT_COOLDOWN_MS = 10000;
+const sensorRt = new Map();
+const channelSmooth = new Map();
 
-const sensorRt = new Map();       /* 每样本运行时平滑/去抖状态（不持久化） */
-const channelSmooth = new Map();  /* 每通道 EMA 平滑值 */
-
-function emaSmooth(prev, next, alpha){
-  if(next == null || !Number.isFinite(next)) return prev;
-  if(prev == null || !Number.isFinite(prev)) return next;
-  return alpha*next + (1-alpha)*prev;
+function emaSmooth(prev,next,alpha){
+  if(next==null||!Number.isFinite(next))return prev;
+  if(prev==null||!Number.isFinite(prev))return next;
+  return alpha*next+(1-alpha)*prev;
 }
-
 function rtOf(id){
-  let r = sensorRt.get(id);
-  if(!r){ r = { smooth:null, pendTarget:null, pendCount:0, lastLogAt:0 }; sensorRt.set(id, r); }
-  return r;
+  let runtime=sensorRt.get(id);
+  if(!runtime){runtime={smooth:null,pendTarget:null,pendCount:0,lastLogAt:0};sensorRt.set(id,runtime);}
+  return runtime;
 }
-
-function logAlertChange(x, prev, next, t, id){
-  if(next === prev) return;
-  const rt = rtOf(id);
-  const now = Date.now();
-  let type = '告警', detail = null;
-  if(next === 'bad' && prev !== 'bad'){
-    detail = `样本「${x.name}」温度 ${t!=null?t.toFixed(2):'--'}℃ 异常`;
-  } else if(next === 'warn' && prev === 'good'){
-    detail = `样本「${x.name}」温度 ${t!=null?t.toFixed(2):'--'}℃ 预警`;
-  } else if(next === 'good' && prev === 'bad'){
-    type = '恢复';
-    detail = `样本「${x.name}」温度 ${t!=null?t.toFixed(2):'--'}℃ 恢复正常`;
-  } else {
-    return;
-  }
-  if(now - rt.lastLogAt < ALERT_COOLDOWN_MS) return; /* 冷却期内不重复记录 */
-  rt.lastLogAt = now;
-  addRecord(x.name, type, detail, id, false);
+function logAlertChange(sample,previous,next,temp,id){
+  if(next===previous)return;
+  const runtime=rtOf(id),now=Date.now();
+  let type='告警',detail=null;
+  if(next==='bad'&&previous!=='bad')detail=`样本「${sample.name}」温度 ${temp!=null?temp.toFixed(2):'--'}℃ 异常`;
+  else if(next==='warn'&&previous==='good')detail=`样本「${sample.name}」温度 ${temp!=null?temp.toFixed(2):'--'}℃ 预警`;
+  else if(next==='good'&&previous==='bad'){type='恢复';detail=`样本「${sample.name}」温度 ${temp!=null?temp.toFixed(2):'--'}℃ 恢复正常`;}
+  else return;
+  if(now-runtime.lastLogAt<ALERT_COOLDOWN_MS)return;
+  runtime.lastLogAt=now;
+  addRecord(sample.name,type,detail,id,false);
 }
 
 function updateTemperatureLive(d,format='串口'){
@@ -765,8 +806,8 @@ function updateTemperatureLive(d,format='串口'){
   $('#tempLiveTime').textContent=now;
   $('#tempLiveFormat').textContent=format;
   if(channel){
-    const smooth=emaSmooth(channelSmooth.get(d.channel), value, EMA_ALPHA);
-    channelSmooth.set(d.channel, smooth);
+    const smooth=emaSmooth(channelSmooth.get(d.channel),value,EMA_ALPHA);
+    channelSmooth.set(d.channel,smooth);
     const hi=channel.hi!=null?channel.hi:Number(state.set.hi);
     const lo=channel.lo!=null?channel.lo:Number(state.set.lo);
     const bad=smooth>hi||smooth<lo;
@@ -899,7 +940,7 @@ function applySensorData(d){
   let tid = null;
   if(d.id && state.s.samples[d.id]) tid = d.id;
   else if(!d.id){ const m = Object.values(state.s.samples).find(x=>x.monitor); if(m) tid = m.id; }
-  if(tid){ appendTempPoint(tid, d.t); updateSampleSensor(tid, d); }
+  if(tid){ appendTempPoint(tid,d.t);updateSampleSensor(tid,d); }
   renderRack();
   refreshStats();
 }
@@ -907,97 +948,70 @@ function applySensorData(d){
 let sensorSaveTimer=null;
 function scheduleSensorSave(){if(!sensorSaveTimer)sensorSaveTimer=setTimeout(()=>{sensorSaveTimer=null;saveAll();},2000);}
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(sensorSaveTimer);sensorSaveTimer=null;saveAll();}});
-/* ==================== 温度追溯：按样本单独持久化（复用设置存储）+ 时间窗降采样 ==================== */
-const TEMP_RAW_WINDOW_MS = 30*60*1000;          /* 原始点保留 30 分钟 */
-const TEMP_BUCKET_MS = 60*1000;                 /* 更早数据按 1 分钟聚合 */
-const TEMP_RETENTION_MS = 7*24*60*60*1000;      /* 总保留 7 天 */
-const TEMP_RAW_MAX = 4000;                      /* 原始点内存安全上限 */
 
+/* ==================== 温度追溯：原始点 + 时间窗降采样 ==================== */
+const TEMP_RAW_WINDOW_MS=30*60*1000;
+const TEMP_BUCKET_MS=60*1000;
+const TEMP_RETENTION_MS=7*24*60*60*1000;
+const TEMP_RAW_MAX=4000;
 function ensureTemp(id){
-  let s = state.set['templog:'+id];
-  if(!s){ s = { raw: [], agg: [] }; state.set['templog:'+id] = s; }
-  return s;
+  let series=state.set['templog:'+id];
+  if(!series){series={raw:[],agg:[]};state.set['templog:'+id]=series;}
+  return series;
 }
-function rollTemp(id, now){
-  const s = ensureTemp(id);
-  const rawCut = now - TEMP_RAW_WINDOW_MS;
-  const retain = now - TEMP_RETENTION_MS;
-  // 原始点过期后滚入 1 分钟桶（按均值聚合）
-  let i = 0;
-  while(i < s.raw.length && s.raw[i].ts < rawCut){
-    const p = s.raw[i];
-    const minute = Math.floor(p.ts / TEMP_BUCKET_MS) * TEMP_BUCKET_MS;
-    const last = s.agg.length ? s.agg[s.agg.length - 1] : null;
-    if(last && last.ts === minute && typeof last.n === 'number'){
-      last.t = (last.t * last.n + p.t) / (last.n + 1); last.n++;
-    } else {
-      s.agg.push({ ts: minute, t: p.t, n: 1 });
-    }
+function rollTemp(id,now){
+  const series=ensureTemp(id),rawCut=now-TEMP_RAW_WINDOW_MS,retain=now-TEMP_RETENTION_MS;
+  let i=0;
+  while(i<series.raw.length&&series.raw[i].ts<rawCut){
+    const point=series.raw[i],minute=Math.floor(point.ts/TEMP_BUCKET_MS)*TEMP_BUCKET_MS;
+    const last=series.agg.length?series.agg[series.agg.length-1]:null;
+    if(last&&last.ts===minute&&typeof last.n==='number'){last.t=(last.t*last.n+point.t)/(last.n+1);last.n++;}
+    else series.agg.push({ts:minute,t:point.t,n:1});
     i++;
   }
-  if(i > 0) s.raw = s.raw.slice(i);
-  // 淘汰超过保留期的桶
-  let j = 0;
-  while(j < s.agg.length && s.agg[j].ts < retain) j++;
-  if(j > 0) s.agg = s.agg.slice(j);
+  if(i>0)series.raw=series.raw.slice(i);
+  let j=0;while(j<series.agg.length&&series.agg[j].ts<retain)j++;
+  if(j>0)series.agg=series.agg.slice(j);
 }
-function appendTempPoint(id, t){
-  if(t == null || !Number.isFinite(t)) return;
-  const s = ensureTemp(id);
-  s.raw.push({ ts: Date.now(), t });
-  if(s.raw.length > TEMP_RAW_MAX) s.raw = s.raw.slice(-TEMP_RAW_MAX);
-  rollTemp(id, Date.now());
+function appendTempPoint(id,temp){
+  if(temp==null||!Number.isFinite(temp))return;
+  const series=ensureTemp(id),now=Date.now();
+  series.raw.push({ts:now,t:temp});
+  if(series.raw.length>TEMP_RAW_MAX)series.raw=series.raw.slice(-TEMP_RAW_MAX);
+  rollTemp(id,now);
   if($('#view-monitor').classList.contains('active') && id === monitorSelId) renderMonitorCharts();
 }
 function tempSeriesPoints(id){
-  const s = state.set['templog:'+id];
-  if(!s) return [];
-  return (s.agg || []).map(p => ({ ts: p.ts, t: p.t })).concat((s.raw || []).map(p => ({ ts: p.ts, t: p.t })));
+  const series=state.set['templog:'+id];
+  if(!series)return [];
+  return (series.agg||[]).map(point=>({ts:point.ts,t:point.t})).concat((series.raw||[]).map(point=>({ts:point.ts,t:point.t})));
 }
 
 function updateSampleSensor(id, d){
   const x = state.s.samples[id];
   if(!x) return;
-  const rt = rtOf(id);
-  const raw = d.t != null ? d.t : null;
-  // ① EMA 平滑：平滑值用于判定与显示
-  rt.smooth = emaSmooth(rt.smooth, raw, EMA_ALPHA);
-  const t = rt.smooth;
-
-  x.lastTemp = t != null ? t : x.lastTemp;
+  const runtime=rtOf(id),raw=d.t!=null?d.t:null;
+  runtime.smooth=emaSmooth(runtime.smooth,raw,EMA_ALPHA);
+  const t=runtime.smooth;
+  x.lastTemp=t!=null?t:x.lastTemp;
   x.lastUpdate = FMT.now();
   x.monitor = true;
-
-  // ② 用平滑值计算目标状态（按样本类型对应的通道阈值，无对应通道时回退全局设置）
-  const th = MotionCore.thresholdFor(MotionCore.categoryCodes[x.type]);
-  const hi = th ? th.hi : Number(state.set.hi);
-  const lo = th ? th.lo : Number(state.set.lo);
-  let target = 'good';
+  const threshold=MotionCore.thresholdFor(MotionCore.categoryCodes[x.type]);
+  const hi=threshold?threshold.hi:Number(state.set.hi),lo=threshold?threshold.lo:Number(state.set.lo);
+  let target='good';
   if(t != null){
-    if(t > hi || t < lo) target = 'bad';
-    else if(t > hi - 2.5 || t < lo + 2.5) target = 'warn';
+    if(t>hi||t<lo)target='bad';
+    else if(t>hi-2.5||t<lo+2.5)target='warn';
   }
-
-  // ③ 去抖：连续 DEBOUNCE_COUNT 次采样都指向同一新状态才切换
-  const cur = x.alert || 'good';
-  if(target === cur){
-    rt.pendTarget = null; rt.pendCount = 0;
-  } else {
-    if(rt.pendTarget === target) rt.pendCount++;
-    else { rt.pendTarget = target; rt.pendCount = 1; }
-  }
-
-  const fire = rt.pendTarget != null && rt.pendCount >= DEBOUNCE_COUNT;
+  const current=x.alert||'good';
+  if(target===current){runtime.pendTarget=null;runtime.pendCount=0;}
+  else if(runtime.pendTarget===target)runtime.pendCount++;
+  else{runtime.pendTarget=target;runtime.pendCount=1;}
+  const fire=runtime.pendTarget!=null&&runtime.pendCount>=DEBOUNCE_COUNT;
   if(fire){
-    const prev = cur;
-    x.alert = rt.pendTarget;
-    rt.pendTarget = null; rt.pendCount = 0;
-    // ④ 记录去重 + 冷却
-    logAlertChange(x, prev, x.alert, t, id);
-    saveAll();
-  } else {
-    scheduleSensorSave();
-  }
+    const previous=current;x.alert=runtime.pendTarget;runtime.pendTarget=null;runtime.pendCount=0;
+    logAlertChange(x,previous,x.alert,t,id);saveAll();
+  }else scheduleSensorSave();
   recomputeStats();
 }
 
@@ -1149,9 +1163,9 @@ function startHttpBridge(){
 }
 
 function renderTemperatureRanges(){
-  Object.entries(MotionCore.temperatureChannels).forEach(([ch,c])=>{
-    const el=$('#tempRange'+ch);
-    if(el) el.textContent = `适宜存储温度 ${c.lo}℃ ~ ${c.hi}℃`;
+  Object.entries(MotionCore.temperatureChannels).forEach(([channel,config])=>{
+    const element=$('#tempRange'+channel);
+    if(element)element.textContent=`适宜存储温度 ${config.lo}℃ ~ ${config.hi}℃`;
   });
 }
 

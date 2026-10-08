@@ -1,0 +1,29 @@
+生息样本库 1.18.2 完整源码清单
+
+一、底层 Android 原生代码
+- vitals-android/app/src/main/java/com/vitals/android/MainActivity.java
+- vitals-android/app/src/main/java/com/vitals/android/VitalsDbHelper.java
+- vitals-android/app/src/main/java/com/vitals/android/UsbLabelPrinter.java
+- vitals-android/app/src/main/java/com/hoho/android/usbserial/（USB 串口驱动完整源码）
+
+二、应用界面与业务源码
+- vitals-android/app/src/main/assets/web/（HTML、CSS、JavaScript、持久化、扫码、打印）
+- vitals-android/app/src/main/res/（Android 资源）
+- vitals-android/app/src/main/AndroidManifest.xml
+
+三、构建与测试源码
+- vitals-android/app/build.gradle
+- vitals-android/build.gradle
+- vitals-android/settings.gradle
+- vitals-android/gradle/wrapper/（Gradle Wrapper）
+- vitals-android/tools/（测试与迁移工具）
+- vitals-android/app/src/androidTest/（Android 仪器测试）
+
+四、文档与可安装程序
+- vitals-android/docs/（协议、数据库结构、测试报告、许可证）
+- vitals-android/output/Vitals-Android-1.18.2.apk
+- vitals-android/README.md
+- 打包说明.txt
+
+版本信息：versionName 1.18.2，versionCode 30，applicationId com.vitals.android。
+说明：未包含构建缓存、本机 SDK 路径及签名私钥；这些内容不是项目源码。

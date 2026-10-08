@@ -1,0 +1,29 @@
+
+PASS USB label encoder preserves black runs and emits one print; rejects invalid size
+PASS new empty database, version and foreign keys
+PASS create sample plus linked record
+PASS update retains FK and photo/extra fields
+PASS barcode unique and parameter binding
+PASS slot range and integer validation
+PASS status and field types
+PASS inbound atomic with history
+PASS occupied slot rejects second sample
+PASS record failure rolls sample update back
+PASS outbound frees slot with retained last slot
+PASS settings JSON values and read
+PASS delete parent retains history via SET NULL
+PASS stale revision and invalid FK reject
+PASS full legacy state JSON import
+PASS current backup and raw collections import
+PASS invalid import rolls back after deletes/inserts
+PASS export import preserves logical data
+PASS closed/reopened DB retains data
+PASS ambiguous legacy names remain unlinked
+PASS SQL itself enforces CHECK and NOT NULL
+PASS concurrent setting writes remain consistent
+PASS legacy DB version 0 migrates once; clearing does not resurrect
+PASS legacy DB version 1 migrates once; clearing does not resurrect
+PASS failed legacy migration retains payload and version
+PASS legacy unfinished task survives migration
+TOTAL 26 passed
+

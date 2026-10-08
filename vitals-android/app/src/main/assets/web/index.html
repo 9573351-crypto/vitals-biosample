@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="styles.css?v=23"><link rel="stylesheet" href="android.css">
 <script src="vendor/qrcode.min.js" defer></script>
 <script src="vendor/chart.umd.js" defer></script>
-<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=24" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script>
+<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=24" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="updater.js" defer></script>
 </head>
 <body>
 
@@ -28,9 +28,6 @@
     </button>
     <button class="nav-item" data-view="library">
       <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5v5H4zM11 4h9v5h-9zM4 11h5v9H4zM11 15h9v5h-9z"/></svg></span><span class="nav-label">样本库</span>
-    </button>
-    <button class="nav-item" data-view="inventory">
-      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7 12 3l8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/><path d="M12 11v10"/><path d="m8 14-2 2 2 2M16 14l2 2-2 2"/></svg></span><span class="nav-label">出入库</span>
     </button>
     <button class="nav-item" data-view="devices">
       <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M12 8v8"/><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 4V2M17 4V2M7 22v-2M17 22v-2"/></svg></span><span class="nav-label">设备连接</span>
@@ -120,23 +117,27 @@
 
     <!-- 样本库 -->
     <section class="view" id="view-library">
-      <div class="lib-head">
-        <div class="search-box">
-          <span class="search-ic">⌕</span>
-          <input id="searchInput" type="text" placeholder="搜索样本名称 / 编号 / 条形码">
-          <button class="text-btn clear" id="clearSearch">清除</button>
-        </div>
-        <div class="lib-actions">
-          <button class="btn primary" id="addSampleBtn">＋ 录入样本</button>
-        </div>
+      <div class="library-tabs" role="tablist" aria-label="样本库功能">
+        <button class="library-tab active" id="libraryListTab" data-library-pane="list" role="tab" aria-selected="true" aria-controls="libraryListPane">样本列表</button>
+        <button class="library-tab" id="libraryInventoryTab" data-library-pane="inventory" role="tab" aria-selected="false" aria-controls="libraryInventoryPane">出入库</button>
       </div>
-      <div class="sample-list glass" id="sampleList"><div class="empty">点击右上角“录入样本”开始创建</div></div>
-    </section>
-
-    <!-- 出入库 -->
-    <section class="view" id="view-inventory">
-      <div class="device-page-intro glass"><div><h3>五槽位样本出入库</h3><p>人工模式由操作人员确认；硬件出库收到机械板 OK 后自动更新库存并释放槽位。</p></div><button class="btn ghost" data-go="devices">前往设备连接</button></div>
-      <div id="motionOperationMount"></div>
+      <div class="library-pane active" id="libraryListPane" role="tabpanel" aria-labelledby="libraryListTab">
+        <div class="lib-head">
+          <div class="search-box">
+            <span class="search-ic">⌕</span>
+            <input id="searchInput" type="text" placeholder="搜索样本名称 / 编号 / 条形码">
+            <button class="text-btn clear" id="clearSearch">清除</button>
+          </div>
+          <div class="lib-actions">
+            <button class="btn primary" id="addSampleBtn">＋ 录入样本</button>
+          </div>
+        </div>
+        <div class="sample-list glass" id="sampleList"><div class="empty">点击右上角“录入样本”开始创建</div></div>
+      </div>
+      <div class="library-pane" id="libraryInventoryPane" role="tabpanel" aria-labelledby="libraryInventoryTab" hidden>
+        <div class="device-page-intro glass"><div><h3>三圆盘样本出入库</h3><p>全血、血清、血浆分别使用独立圆盘，每个圆盘包含 1—5 号五个位置。</p></div><button class="btn ghost" data-go="devices">前往设备连接</button></div>
+        <div id="motionOperationMount"></div>
+      </div>
     </section>
 
     <!-- 设备连接 -->
@@ -239,9 +240,9 @@
       </div>
       <div class="form-row">
         <label class="field"><span>样本类型</span><select id="fType" class="select">
-          <option>全血</option><option>血清</option><option>血浆</option><option>DNA</option><option>RNA</option><option>尿液</option><option>组织切片</option><option>其他</option>
+          <option>全血</option><option>血清</option><option>血浆</option>
         </select></label>
-        <label class="field"><span>存放位置</span><input id="fLoc" class="input" placeholder="如 A-01-03"></label>
+        <label class="field"><span>存放位置 *</span><select id="fSlot" class="select" aria-label="存放位置"></select></label>
       </div>
       <div class="form-row">
         <label class="field"><span>采集时间</span><input id="fTime" type="datetime-local" class="input"></label>
@@ -319,7 +320,7 @@
 
 <script>
 // 注入构建版本标记（用于排错缓存）
-window.__VITALS = { version: 'v1.9.2', build: Date.now() };
+window.__VITALS = { version: 'v1.18.2', build: Date.now() };
 </script>
 </body>
 </html>

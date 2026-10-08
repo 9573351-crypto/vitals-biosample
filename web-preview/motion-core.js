@@ -2,20 +2,29 @@
 (function(root){
   const categoryCodes=Object.freeze({'全血':'A','血清':'B','血浆':'C','DNA':'D','RNA':'E','尿液':'F','组织切片':'G','其他':'H'});
   const temperatureChannels=Object.freeze({B1:{category:'A',type:'全血',lo:30,hi:65},B2:{category:'B',type:'血清',lo:25,hi:65},B3:{category:'C',type:'血浆',lo:25,hi:60}});
+  const storageTypes=Object.freeze(['全血','血清','血浆']);
   const api={
     categoryCodes,
     temperatureChannels,
+    storageTypes,
     thresholdFor(category){
       if(!category)return null;
-      const ch=Object.values(temperatureChannels).find(c=>c.category===category);
-      return ch?{lo:ch.lo,hi:ch.hi}:null;
+      const channel=Object.values(temperatureChannels).find(c=>c.category===category);
+      return channel?{lo:channel.lo,hi:channel.hi}:null;
     },
+    disc(type){
+      if(!storageTypes.includes(type))throw Error('当前只支持全血、血清、血浆三个存储圆盘');
+      return {type,category:categoryCodes[type],name:type+'圆盘'};
+    },
+    slotKey(type,slot){api.disc(type);api.position(slot);return type+'\u0000'+slot;},
+    slotLabel(type,slot){api.position(slot);return api.disc(type).name+' '+slot+'号';},
     position(slot){
       if(!Number.isInteger(slot)||slot<1||slot>5)throw Error('圆槽位置无效');
       return slot-1;
     },
     command(sample,action,slot){
-      if(!sample||!categoryCodes[sample.type])throw Error('样本种类没有对应机械编码');
+      if(!sample)throw Error('缺少样本');
+      api.disc(sample.type);
       if(!['in','out'].includes(action))throw Error('出入库指示无效');
       const position=api.position(slot);
       return `${action==='in'?'IN':'OUT'},${categoryCodes[sample.type]}-${position}`;
@@ -52,7 +61,10 @@
       else if(message.type==='failed'){t.phase='uncertain';t.error=String(message.error||'硬件报告失败');}
       return t;
     },
-    slotFree(samples,slot,id){return !Object.values(samples).some(x=>x.id!==id && x.status!=='out' && x.slot===slot);},
+    slotFree(samples,type,slot,id){
+      api.slotKey(type,slot);
+      return !Object.values(samples).some(x=>x.id!==id && x.status!=='out' && x.type===type && x.slot===slot);
+    },
     validateBackup(data){
       if(!data || typeof data!=='object')throw Error('备份格式不正确');
       if(data.s && data.s.samples)data={samples:data.s.samples,records:data.rec||data.s.records||[],settings:data.set||data.s.settings||{}};
@@ -74,7 +86,11 @@
         if(x.env!=null && (!Array.isArray(x.env)||x.env.some(e=>!e||typeof e!=='object'||['temp','hum'].some(k=>e[k]!=null&&(typeof e[k]!=='number'||!Number.isFinite(e[k]))))))throw Error('历史曲线无效');
         if(x.slot!=null){
           if(!Number.isInteger(x.slot)||x.slot<1||x.slot>5)throw Error('槽位必须是 1—5');
-          if(x.status==='in'){if(slots.has(x.slot))throw Error('多个样本占用同一槽位');slots.add(x.slot);}
+          if(x.status==='in'){
+            const slotKey=api.slotKey(x.type,x.slot);
+            if(slots.has(slotKey))throw Error('同一圆盘内有多个样本占用同一槽位');
+            slots.add(slotKey);
+          }
           else{x.lastSlot=x.slot;delete x.slot;}
         }
         samples[x.id]=x;

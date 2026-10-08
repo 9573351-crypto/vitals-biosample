@@ -14,7 +14,8 @@ import java.util.*;
  */
 public final class VitalsDbHelper extends SQLiteOpenHelper {
     public static final String DB_NAME = "vitals.db";
-    public static final int DB_VERSION = 2;
+    public static final int DB_VERSION = 3;
+    private static final Set<String> STORAGE_TYPES = new HashSet<>(Arrays.asList("全血","血清","血浆"));
     private static final String[] JS = {"id","name","code","status","slot","lastSlot","pendingIntake","type","loc","timeRaw","timeTxt","temp","note","photo","createdAt","updatedAt","monitor","lastTemp","lastHum","lastLight","lastUpdate","alert","qrSnap"};
     private static final String[] SQL = {"sample_id","name","barcode","status","slot","last_slot","pending_intake","type","location","collected_at","collected_time_text","temperature","note","photo","created_at","updated_at","monitor","last_temperature","last_humidity","last_light","last_update","alert","qr_snapshot"};
     private static final Set<String> INTS = new HashSet<>(Arrays.asList("slot","lastSlot","createdAt","updatedAt"));
@@ -26,14 +27,25 @@ public final class VitalsDbHelper extends SQLiteOpenHelper {
     VitalsDbHelper(Context context,String name){super(context,name,null,DB_VERSION);}
     @Override public void onConfigure(SQLiteDatabase db){db.setForeignKeyConstraintsEnabled(true);}
     @Override public void onCreate(SQLiteDatabase db){createTables(db);migrateLegacy(db);}
-    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){createTables(db);migrateLegacy(db);}
+    @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){if(oldVersion<3)upgradeToThreeDiscs(db);createTables(db);migrateLegacy(db);}
     @Override public void onOpen(SQLiteDatabase db){super.onOpen(db);migrateLegacy(db);}
     private void createTables(SQLiteDatabase db){
-        db.execSQL("CREATE TABLE IF NOT EXISTS samples (sample_id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, barcode TEXT UNIQUE, status TEXT NOT NULL CHECK(status IN ('in','out')), slot INTEGER UNIQUE CHECK(slot IS NULL OR (typeof(slot)='integer' AND slot BETWEEN 1 AND 5)), last_slot INTEGER CHECK(last_slot IS NULL OR (typeof(last_slot)='integer' AND last_slot BETWEEN 1 AND 5)), pending_intake INTEGER NOT NULL DEFAULT 0 CHECK(pending_intake IN (0,1)), type TEXT, location TEXT, collected_at TEXT, collected_time_text TEXT, temperature REAL, note TEXT, photo TEXT, created_at INTEGER, updated_at INTEGER, monitor INTEGER NOT NULL DEFAULT 0 CHECK(monitor IN (0,1)), last_temperature REAL, last_humidity REAL, last_light REAL, last_update TEXT, alert TEXT CHECK(alert IS NULL OR alert IN ('good','warn','bad')), qr_snapshot TEXT, extra_json TEXT NOT NULL DEFAULT '{}', CHECK(status='in' OR slot IS NULL))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS samples (sample_id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, barcode TEXT UNIQUE, status TEXT NOT NULL CHECK(status IN ('in','out')), slot INTEGER CHECK(slot IS NULL OR (typeof(slot)='integer' AND slot BETWEEN 1 AND 5)), last_slot INTEGER CHECK(last_slot IS NULL OR (typeof(last_slot)='integer' AND last_slot BETWEEN 1 AND 5)), pending_intake INTEGER NOT NULL DEFAULT 0 CHECK(pending_intake IN (0,1)), type TEXT, location TEXT, collected_at TEXT, collected_time_text TEXT, temperature REAL, note TEXT, photo TEXT, created_at INTEGER, updated_at INTEGER, monitor INTEGER NOT NULL DEFAULT 0 CHECK(monitor IN (0,1)), last_temperature REAL, last_humidity REAL, last_light REAL, last_update TEXT, alert TEXT CHECK(alert IS NULL OR alert IN ('good','warn','bad')), qr_snapshot TEXT, extra_json TEXT NOT NULL DEFAULT '{}', UNIQUE(type,slot), CHECK(slot IS NULL OR type IN ('全血','血清','血浆')), CHECK(status='in' OR slot IS NULL))");
         db.execSQL("CREATE TABLE IF NOT EXISTS records (id INTEGER PRIMARY KEY AUTOINCREMENT, sample_id TEXT, sample_name TEXT NOT NULL DEFAULT '', time TEXT NOT NULL DEFAULT '', type TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', barcode TEXT, slot INTEGER CHECK(slot IS NULL OR (typeof(slot)='integer' AND slot BETWEEN 1 AND 5)), status TEXT CHECK(status IS NULL OR status IN ('in','out')), task_id TEXT, extra_json TEXT NOT NULL DEFAULT '{}', FOREIGN KEY(sample_id) REFERENCES samples(sample_id) ON DELETE SET NULL)");
         db.execSQL("CREATE INDEX IF NOT EXISTS records_sample_time ON records(sample_id,time)");
         db.execSQL("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS db_meta (key TEXT PRIMARY KEY NOT NULL,value TEXT NOT NULL)");
+    }
+    private void upgradeToThreeDiscs(SQLiteDatabase db){
+        if(!table(db,"samples"))return;
+        db.execSQL("CREATE TABLE samples_v3 (sample_id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, barcode TEXT UNIQUE, status TEXT NOT NULL CHECK(status IN ('in','out')), slot INTEGER CHECK(slot IS NULL OR (typeof(slot)='integer' AND slot BETWEEN 1 AND 5)), last_slot INTEGER CHECK(last_slot IS NULL OR (typeof(last_slot)='integer' AND last_slot BETWEEN 1 AND 5)), pending_intake INTEGER NOT NULL DEFAULT 0 CHECK(pending_intake IN (0,1)), type TEXT, location TEXT, collected_at TEXT, collected_time_text TEXT, temperature REAL, note TEXT, photo TEXT, created_at INTEGER, updated_at INTEGER, monitor INTEGER NOT NULL DEFAULT 0 CHECK(monitor IN (0,1)), last_temperature REAL, last_humidity REAL, last_light REAL, last_update TEXT, alert TEXT CHECK(alert IS NULL OR alert IN ('good','warn','bad')), qr_snapshot TEXT, extra_json TEXT NOT NULL DEFAULT '{}', UNIQUE(type,slot), CHECK(slot IS NULL OR type IN ('全血','血清','血浆')), CHECK(status='in' OR slot IS NULL))");
+        db.execSQL("INSERT INTO samples_v3 SELECT sample_id,name,barcode,status,slot,last_slot,pending_intake,type,location,collected_at,collected_time_text,temperature,note,photo,created_at,updated_at,monitor,last_temperature,last_humidity,last_light,last_update,alert,qr_snapshot,extra_json FROM samples");
+        db.execSQL("CREATE TABLE records_v3 (id INTEGER PRIMARY KEY AUTOINCREMENT, sample_id TEXT, sample_name TEXT NOT NULL DEFAULT '', time TEXT NOT NULL DEFAULT '', type TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', barcode TEXT, slot INTEGER CHECK(slot IS NULL OR (typeof(slot)='integer' AND slot BETWEEN 1 AND 5)), status TEXT CHECK(status IS NULL OR status IN ('in','out')), task_id TEXT, extra_json TEXT NOT NULL DEFAULT '{}', FOREIGN KEY(sample_id) REFERENCES samples_v3(sample_id) ON DELETE SET NULL)");
+        db.execSQL("INSERT INTO records_v3 SELECT id,sample_id,sample_name,time,type,detail,barcode,slot,status,task_id,extra_json FROM records");
+        db.execSQL("DROP TABLE records");
+        db.execSQL("DROP TABLE samples");
+        db.execSQL("ALTER TABLE samples_v3 RENAME TO samples");
+        db.execSQL("ALTER TABLE records_v3 RENAME TO records");
     }
     private static boolean table(SQLiteDatabase db,String name){try(Cursor c=db.rawQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",new String[]{name})){return c.moveToFirst();}}
     private static String meta(SQLiteDatabase db,String key,String fallback){try(Cursor c=db.rawQuery("SELECT value FROM db_meta WHERE key=?",new String[]{key})){return c.moveToFirst()?c.getString(0):fallback;}}
@@ -89,6 +101,7 @@ public final class VitalsDbHelper extends SQLiteOpenHelper {
         }
         for(String k:Arrays.asList("slot","lastSlot"))if(value(x,k))range(x.get(k),k);
         if("out".equals(x.getString("status"))&&value(x,"slot")){x.put("lastSlot",x.get("slot"));x.remove("slot");}
+        if(value(x,"slot")&&!STORAGE_TYPES.contains(text(x,"type",true)))throw new JSONException("当前只支持全血、血清、血浆三个存储圆盘");
         if(value(x,"alert")&&!Arrays.asList("good","warn","bad").contains(x.getString("alert")))throw new JSONException("无效温度状态");
         if(value(x,"photo")&&!x.getString("photo").isEmpty()&&!x.getString("photo").matches("(?s)^data:image/(png|jpeg|webp);base64,[a-zA-Z0-9+/=\\s]+$"))throw new JSONException("照片格式不支持");
         if(value(x,"env")){
@@ -118,7 +131,7 @@ public final class VitalsDbHelper extends SQLiteOpenHelper {
         if(data.has("s")){JSONObject s=data.getJSONObject("s");samples=s.get("samples");records=data.has("rec")?data.getJSONArray("rec"):s.optJSONArray("records");settings=data.has("set")?data.getJSONObject("set"):s.optJSONObject("settings");}
         else if(data.has("samples")){samples=data.get("samples");records=data.has("records")?data.getJSONArray("records"):new JSONArray();settings=data.has("settings")?data.getJSONObject("settings"):new JSONObject();}
         if(!(samples instanceof JSONObject)&&!(samples instanceof JSONArray))throw new JSONException("样本集合格式无效");
-        JSONObject normalized=new JSONObject();Set<String> codes=new HashSet<>();Set<Integer> slots=new HashSet<>();
+        JSONObject normalized=new JSONObject();Set<String> codes=new HashSet<>();Set<String> slots=new HashSet<>();
         List<String> keys=new ArrayList<>();
         if(samples instanceof JSONObject)((JSONObject)samples).keys().forEachRemaining(keys::add);
         else for(int i=0;i<((JSONArray)samples).length();i++)keys.add(Integer.toString(i));
@@ -127,7 +140,7 @@ public final class VitalsDbHelper extends SQLiteOpenHelper {
             JSONObject x=normalizeSample(item,key);String sid=x.getString("id");
             if(normalized.has(sid))throw new JSONException("样本 ID 重复："+sid);
             String code=text(x,"code",false);if(code!=null&&!code.isEmpty()&&!codes.add(code))throw new JSONException("条码重复："+code);
-            if(value(x,"slot")&&!slots.add(x.getInt("slot")))throw new JSONException("槽位重复："+x.getInt("slot"));
+            if(value(x,"slot")){String slot=x.getString("type")+"\u0000"+x.getInt("slot");if(!slots.add(slot))throw new JSONException(x.getString("type")+"圆盘槽位重复："+x.getInt("slot"));}
             normalized.put(sid,x);
         }
         JSONObject set=normalizeSettings(settings==null?new JSONObject():settings);
@@ -193,12 +206,14 @@ public final class VitalsDbHelper extends SQLiteOpenHelper {
     private static void validateTask(SQLiteDatabase db)throws JSONException{
         JSONObject set=normalizeSettings(settings(db));if(!value(set,"motionTask"))return;
         JSONObject t=set.getJSONObject("motionTask");String sid=t.getString("sampleId");
-        try(Cursor c=db.rawQuery("SELECT status,slot FROM samples WHERE sample_id=?",new String[]{sid})){
+        String sampleType;
+        try(Cursor c=db.rawQuery("SELECT status,slot,type FROM samples WHERE sample_id=?",new String[]{sid})){
             if(!c.moveToFirst())throw new JSONException("任务样本不存在");
             if(t.getString("action").equals("out")&&(!c.getString(0).equals("in")||c.isNull(1)||c.getInt(1)!=t.getInt("slot")))throw new JSONException("出库任务与在库槽位不一致");
             if(t.getString("action").equals("in")&&!c.getString(0).equals("out"))throw new JSONException("入库任务样本已在库");
+            sampleType=c.getString(2);if(!STORAGE_TYPES.contains(sampleType))throw new JSONException("任务样本没有对应存储圆盘");
         }
-        try(Cursor c=db.rawQuery("SELECT 1 FROM samples WHERE slot=? AND sample_id<>?",new String[]{Integer.toString(t.getInt("slot")),sid})){if(c.moveToFirst())throw new JSONException("任务槽位被其他样本占用");}
+        try(Cursor c=db.rawQuery("SELECT 1 FROM samples WHERE type=? AND slot=? AND sample_id<>?",new String[]{sampleType,Integer.toString(t.getInt("slot")),sid})){if(c.moveToFirst())throw new JSONException("任务圆盘槽位被其他样本占用");}
     }
     private static long revision(SQLiteDatabase db){return Long.parseLong(meta(db,"revision","0"));}
     public synchronized JSONObject info()throws JSONException{SQLiteDatabase db=getReadableDatabase();return new JSONObject().put("version",db.getVersion()).put("revision",revision(db)).put("legacyMigration",meta(db,"legacy_migration",""));}

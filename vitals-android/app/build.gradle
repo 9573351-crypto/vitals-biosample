@@ -7,10 +7,14 @@ android {
         applicationId 'com.vitals.android'
         minSdk 26
         targetSdk 34
-        versionCode 20
-        versionName '1.10.0'
+        versionCode 30
+        versionName '1.18.2'
         testInstrumentationRunner 'com.vitals.android.DatabaseInstrumentation'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
-dependencies { implementation 'androidx.annotation:annotation:1.9.1' }
+dependencies {
+    implementation 'androidx.annotation:annotation:1.9.1'
+    // 内置更新需要通过 FileProvider 把下载好的 APK 交给系统安装器
+    implementation 'androidx.core:core:1.13.1'
+}
