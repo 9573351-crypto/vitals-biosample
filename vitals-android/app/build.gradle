@@ -7,8 +7,8 @@ android {
         applicationId 'com.vitals.android'
         minSdk 26
         targetSdk 34
-        versionCode 30
-        versionName '1.18.2'
+        versionCode 31
+        versionName '1.19.0'
         testInstrumentationRunner 'com.vitals.android.DatabaseInstrumentation'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
@@ -17,4 +17,6 @@ dependencies {
     implementation 'androidx.annotation:annotation:1.9.1'
     // 内置更新需要通过 FileProvider 把下载好的 APK 交给系统安装器
     implementation 'androidx.core:core:1.13.1'
+    // 用户首次选择一体机内部目录后，自动备份可持续写入该目录。
+    implementation 'androidx.documentfile:documentfile:1.0.1'
 }

@@ -4,7 +4,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 当前版本 | **1.18.2**（versionCode 30） |
+| 当前版本 | **1.19.0**（versionCode 31） |
 | 包名 | `com.vitals.android` |
 | 形态 | Android 应用（WebView + JS 桥 + SQLite），`web-preview/` 为浏览器预览版 |
 | 更新来源 | 本仓库的 GitHub Release |
@@ -17,6 +17,7 @@
 vitals-android/                  Android 工程（构建入口）
 ├── app/src/main/java/com/vitals/android/
 │   ├── MainActivity.java        WebView 宿主、JS 桥、USB 串口、文件导入导出
+│   ├── BackupManager.java       一体机内部目录自动备份与保留策略
 │   ├── VitalsDbHelper.java      SQLite 唯一持久化真源（schema v3）
 │   ├── VitalsUpdater.java       内置更新：检查 / 下载 / 校验
 │   └── UsbLabelPrinter.java     得力 DL-720 标签打印（TSPL）
@@ -92,6 +93,7 @@ node tools\updater.test.mjs     # 一键更新：入口、状态机、原生调�
 - SQLite 为唯一持久化真源，四张表：`samples` / `records` / `settings` / `db_meta`（schema v3：槽位唯一约束为「样本类型 + 槽位」，全血 / 血清 / 血浆各占一个圆盘，每盘 5 位，共 15 位）。
 - 写入采用行级差分 + `revision` 乐观锁 + 单事务提交；前端只发送变化的行。
 - 备份为 JSON：`{app, version, exportedAt, samples, records, settings}`；导入为事务内整体替换，失败自动回滚并保留原数据，含未完成机械任务的备份会被拒绝导入。
+- 1.19.0 起可在「设置 → 一体机内部自动备份」首次选择内部存储目录。之后数据变化会在 5 秒防抖后自动生成 JSON，应用启动且超过 24 小时未备份时会补做一次，目录内保留最近 30 份。目录通过 Android 系统授权，不需要 U 盘；卸载应用不会主动删除已生成的公共存储备份。
 
 ---
 

@@ -6,6 +6,7 @@ import android.hardware.usb.*;
 import android.os.Build;
 import android.graphics.*;
 import android.util.Base64;
+import androidx.core.content.ContextCompat;
 import org.json.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -27,8 +28,7 @@ final class UsbLabelPrinter {
         this.context=context; this.listener=listener;
         manager=(UsbManager)context.getSystemService(Context.USB_SERVICE);
         IntentFilter filter=new IntentFilter(ACTION);
-        if(Build.VERSION.SDK_INT>=33) context.registerReceiver(receiver,filter,Context.RECEIVER_NOT_EXPORTED);
-        else context.registerReceiver(receiver,filter);
+        ContextCompat.registerReceiver(context,receiver,filter,ContextCompat.RECEIVER_NOT_EXPORTED);
     }
     private UsbInterface printerInterface(UsbDevice device) {
         for(int i=0;i<device.getInterfaceCount();i++) {

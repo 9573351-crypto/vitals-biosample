@@ -27,9 +27,11 @@ public class MainActivity extends Activity {
     private static final int REQ_IMPORT = 2;
     private static final int REQ_PHOTO = 3;
     private static final int REQ_INSTALL_PERMISSION = 4;
+    private static final int REQ_BACKUP_DIRECTORY = 5;
     private WebView web;
     private SQLiteDatabase db;
     private VitalsDbHelper dbHelper;
+    private BackupManager backupManager;
     private UsbManager usb;
     private UsbLabelPrinter labelPrinter;
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
@@ -48,6 +50,7 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         dbHelper = new VitalsDbHelper(this);
+        backupManager = new BackupManager(this, dbHelper);
         usb = (UsbManager)getSystemService(USB_SERVICE);
         labelPrinter = new UsbLabelPrinter(this, (type,message) -> event(type,"printer",message));
         web = new WebView(this);
@@ -101,6 +104,7 @@ public class MainActivity extends Activity {
         io.execute(() -> {
             try {
                 db = dbHelper.getWritableDatabase();
+                backupManager.scheduleStartupIfDue();
                 runOnUiThread(() -> {if(!destroyed)web.loadUrl(ORIGIN+"web/index.html");});
             } catch(Exception e) {
                 Log.e("VitalsDB","Database open failed; legacy data retained",e);
@@ -230,13 +234,24 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String getSampleByBarcode(String code){return databaseCall(() -> dbHelper.getSample(code,true));}
         @JavascriptInterface public String getRecords(String sampleId){return databaseCall(() -> dbHelper.getRecords(sampleId));}
         @JavascriptInterface public String getSettings(){return databaseCall(() -> dbHelper.getSettings());}
-        @JavascriptInterface public String saveSample(String payload,String record){return databaseCall(() -> dbHelper.saveSample(new JSONObject(payload),optionalRecord(record)));}
-        @JavascriptInterface public String deleteSample(String id,String record){return databaseCall(() -> dbHelper.deleteSample(id,optionalRecord(record)));}
-        @JavascriptInterface public String addRecord(String payload){return databaseCall(() -> dbHelper.addRecord(new JSONObject(payload)));}
-        @JavascriptInterface public String setSetting(String key,String jsonValue){return databaseCall(() -> dbHelper.setSetting(key,new JSONTokener(jsonValue).nextValue()));}
-        @JavascriptInterface public String commitChanges(String payload){return databaseCall(() -> dbHelper.commit(new JSONObject(payload)));}
-        @JavascriptInterface public String importBackup(String payload){return databaseCall(() -> dbHelper.replaceBackup(payload));}
+        @JavascriptInterface public String saveSample(String payload,String record){return databaseMutation(() -> dbHelper.saveSample(new JSONObject(payload),optionalRecord(record)));}
+        @JavascriptInterface public String deleteSample(String id,String record){return databaseMutation(() -> dbHelper.deleteSample(id,optionalRecord(record)));}
+        @JavascriptInterface public String addRecord(String payload){return databaseMutation(() -> dbHelper.addRecord(new JSONObject(payload)));}
+        @JavascriptInterface public String setSetting(String key,String jsonValue){return databaseMutation(() -> dbHelper.setSetting(key,new JSONTokener(jsonValue).nextValue()));}
+        @JavascriptInterface public String commitChanges(String payload){return databaseMutation(() -> dbHelper.commit(new JSONObject(payload)));}
+        @JavascriptInterface public String importBackup(String payload){return databaseMutation(() -> dbHelper.replaceBackup(payload));}
         @JavascriptInterface public String getBackup(){return databaseCall(() -> dbHelper.exportBackup());}
+        @JavascriptInterface public String getBackupStatus(){return databaseCall(() -> backupManager.status());}
+        @JavascriptInterface public void chooseBackupDirectory(){
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+                try { startActivityForResult(intent, REQ_BACKUP_DIRECTORY); }
+                catch(Exception e) { event("backup","error","无法打开目录选择器"); }
+            });
+        }
+        @JavascriptInterface public void backupNow(){backupManager.backupNow((ok,message) -> event("backup",ok?"saved":"error",message));}
+        @JavascriptInterface public void disableAutoBackup(){backupManager.clear();event("backup","disabled","自动备份已关闭，已有备份文件不会删除");}
         @JavascriptInterface public String getExternalDevices(){return externalDevicesJson();}
         @JavascriptInterface public String getAppVersion(){try{return new JSONObject().put("version",BuildConfig.VERSION_NAME).put("versionCode",BuildConfig.VERSION_CODE).put("repo",VitalsUpdater.REPO).toString();}catch(JSONException impossible){return "{}";}}
         @JavascriptInterface public void checkUpdate(){checkUpdateAsync();}
@@ -281,6 +296,9 @@ public class MainActivity extends Activity {
     private String databaseCall(DatabaseOperation operation){
         try {if(destroyed)throw new IllegalStateException("应用已关闭");Object result=operation.run();return result==null?"null":result.toString();}
         catch(Exception e){Log.e("VitalsDB","Database operation failed",e);try{return new JSONObject().put("ok",false).put("error",e.getMessage()==null?"数据库操作失败":e.getMessage()).toString();}catch(JSONException impossible){return "{\"ok\":false,\"error\":\"数据库操作失败\"}";}}
+    }
+    private String databaseMutation(DatabaseOperation operation){
+        return databaseCall(() -> {Object result=operation.run();backupManager.scheduleAfterChange();return result;});
     }
     private void choosePort(String role,int baud) {
         if(pendingPort!=null || !opening.isEmpty()) { event("error",role,"请先完成当前 USB 授权／连接"); return; }
@@ -398,6 +416,17 @@ public class MainActivity extends Activity {
             else { pendingInstallPath = null; updateEvent("cancelled", updateMessage("未授予安装权限，更新已暂停；可稍后再次点击「一键更新」")); }
             return;
         }
+        if (req == REQ_BACKUP_DIRECTORY) {
+            if (result != RESULT_OK || data == null || data.getData() == null) { event("backup","cancelled","未更改备份目录"); return; }
+            Uri treeUri = data.getData();
+            try {
+                getContentResolver().takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                backupManager.configure(treeUri);
+                event("backup","selected","已选择一体机内部备份目录");
+                backupManager.backupNow((ok,message) -> event("backup",ok?"saved":"error",message));
+            } catch(Exception e) { event("backup","error","无法保存备份目录授权："+(e.getMessage()==null?"未知错误":e.getMessage())); }
+            return;
+        }
         if(req==3) { if(files!=null){files.onReceiveValue(result==RESULT_OK && data!=null?new Uri[]{data.getData()}:null);files=null;}return; }
         if(result!=RESULT_OK || data==null || data.getData()==null) {if(req==1)exportContent=null;event("info","","已取消文件操作");return;}
         Uri uri=data.getData(); String content=exportContent; if(req==1)exportContent=null;
@@ -417,6 +446,7 @@ public class MainActivity extends Activity {
     @Override public void onBackPressed() {web.evaluateJavascript("window.androidBack && window.androidBack()",null);}
     @Override protected void onDestroy() {
         labelPrinter.close();
+        backupManager.close();
         destroyed=true;for(String r:new ArrayList<>(sessions.keySet()))close(r);
         unregisterReceiver(receiver);unregisterReceiver(deviceReceiver);io.shutdownNow();web.removeJavascriptInterface("AndroidHost");web.destroy();
         dbHelper.close();

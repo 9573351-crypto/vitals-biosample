@@ -10,6 +10,9 @@ const page=await browser.newPage({viewport:{width:1280,height:800}}),errors=[];
 page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message);});
 await page.addInitScript({path:path.resolve(__dirname,'mock-bridge.js')});
 await page.goto('http://127.0.0.1:'+server.address().port);await page.addScriptTag({content:'var module=undefined,exports=undefined,define=undefined;'+fs.readFileSync(path.join(root,'vendor/jsQR.js'),'utf8')});await page.waitForTimeout(500);
+assert.equal(await page.locator('#backupCard').count(),1);
+assert.equal(await page.locator('#backupPill').innerText(),'未设置');
+assert.equal(await page.locator('#backupNow').isDisabled(),true);
 assert.equal(await page.locator('#statTotal').innerText(),'0');
 assert.equal(await page.locator('#statOnline').innerText(),'2');
 assert.equal(await page.locator('#statOnlineDetail').innerText(),'温控 0 · 机械 0 · 扫码枪 1 · 打印机 1');
@@ -232,7 +235,7 @@ assert.equal(await page.evaluate(id=>{
 fs.mkdirSync(path.resolve(__dirname,'../docs/screenshots'),{recursive:true});
 await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots/tablet.png'),fullPage:true});
 await page.setViewportSize({width:1024,height:600});await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots/panel-1024.png'),fullPage:true});
-assert.deepEqual(errors,[]);console.log('PASS: UI create/edit, write failure recovery, revision conflicts during task feedback/completion/cancellation, zero temperature limit, invalid bounds, no false save success, record FK, unchanged rows not written, manual in/out, wrong scan, restart, export/print, hardware ACK/arrival separation, task recovery; no JS errors.');
+assert.deepEqual(errors,[]);console.log('PASS: UI auto-backup card, create/edit, write failure recovery, revision conflicts during task feedback/completion/cancellation, zero temperature limit, invalid bounds, no false save success, record FK, unchanged rows not written, manual in/out, wrong scan, restart, export/print, hardware ACK/arrival separation, task recovery; no JS errors.');
 }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exit(1);});
 

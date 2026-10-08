@@ -9,6 +9,7 @@ const methods={
  getRecords:id=>read().records.filter(r=>!id||r.sampleId===id),getSettings:()=>read().settings,
  getSample:id=>read().samples[id]||null,getSampleByBarcode:code=>Object.values(read().samples).find(s=>s.code===code)||null,
  getBackup:()=>({app:'vitals-biosample',version:2,samples:read().samples,records:read().records,settings:read().settings}),
+ getBackupStatus:()=>({configured:false,lastSuccess:0}),
  commitChanges:json=>{
   if(window.failCommit){window.failCommit=false;throw Error('测试注入：磁盘写入失败');}
   const d=JSON.parse(json),db=read();if(d.expectedRevision!==db.revision)throw Error('revision conflict');
@@ -29,5 +30,5 @@ const methods={
  }
 };
 window.AndroidHost={};for(const [name,fn] of Object.entries(methods))AndroidHost[name]=(...args)=>{nativeCalls.push({name,args});try{return JSON.stringify(fn(...args));}catch(e){return JSON.stringify({ok:false,error:e.message});}};
-Object.assign(AndroidHost,{connect:()=>{},disconnect:()=>{},send:()=>{},importJson:()=>{},exportJson:(n,c)=>window.lastExport=JSON.parse(c),printLabel:()=>{window.printCalled=true;}});
+Object.assign(AndroidHost,{connect:()=>{},disconnect:()=>{},send:()=>{},importJson:()=>{},exportJson:(n,c)=>window.lastExport=JSON.parse(c),printLabel:()=>{window.printCalled=true;},chooseBackupDirectory:()=>{},backupNow:()=>{},disableAutoBackup:()=>{}});
 })();

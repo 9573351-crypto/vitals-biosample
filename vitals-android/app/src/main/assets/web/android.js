@@ -225,6 +225,7 @@ function receiveImport(text){
 window.onAndroidEvent=(type,role,text)=>{
   if(type==='devices'&&role==='external'){applyExternalDevices(text);return;}
   if(type==='update'){if(window.onVitalsUpdateEvent)window.onVitalsUpdateEvent(text);return;}
+  if(type==='backup'){if(window.onVitalsBackupEvent)window.onVitalsBackupEvent(role,text);return;}
   if(role==='printer'){if(window.onPrinterEvent)window.onPrinterEvent(type,text);return;}
   if(type==='import'){receiveImport(text);return;}
   if(type==='line'){
@@ -320,7 +321,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const scannerActions=document.createElement('div');scannerActions.className='scanner-actions';scannerActions.id='scannerActions';$('#libraryListPane').prepend(scannerActions);
   for(const id of ['resetBtn','importBtn'])$('#'+id).addEventListener('click',e=>{if(state.set.motionTask){e.preventDefault();e.stopImmediatePropagation();toast('请先处理当前出入库任务');}},true);
   $('#simStartBtn').addEventListener('click',e=>{if(hardware.sensor){e.stopImmediatePropagation();toast('请先断开真实温控设备再模拟');}},true);
-  $('#buildTag').textContent='Android 1.18.2 · 人工出库免扫码';
+  $('#buildTag').textContent='Android 1.19.0 · 一体机内部自动备份';
   if(state.set.motionTask)persistTask({...state.set.motionTask,phase:'uncertain',error:'应用重新启动，请人工核实上次操作；不会自动重发指令'});
   renderTask();
   refreshStm32Console();
