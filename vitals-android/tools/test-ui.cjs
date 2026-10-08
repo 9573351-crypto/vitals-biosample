@@ -227,10 +227,13 @@ assert.equal(await page.evaluate(id=>{
  const sample=state.s.samples[id],before=JSON.stringify(sample);
  applySensorData({id,h:60});
  const ignored=before===JSON.stringify(sample);
- for(let i=0;i<5;i++)applySensorData({id,t:4,l:200,h:'legacy ignored'});
+ applySensorData({id,t:4,l:200,h:'legacy ignored'});
+ rtOf(id).pendSince=Date.now()-DEBOUNCE_MS-1;
+ applySensorData({id,t:4,l:200,h:'legacy ignored'});
  const current=state.s.samples[id],series=state.set['templog:'+id];
- series.raw[0].ts=Date.now()-31*60*1000;rollTemp(id,Date.now());
- return ignored&&current.lastTemp===4&&current.alert==='bad'&&series.raw.length===4&&series.agg.length===1&&series.agg[0].t===4;
+ series.raw[0].ab=1;series.raw[0].ts=Date.now()-31*60*1000;rollTemp(id,Date.now());
+ series.agg[0].ts=Date.now()-8*24*60*60*1000;rollTemp(id,Date.now());
+ return ignored&&current.lastTemp===4&&current.alert==='bad'&&series.raw.length===1&&series.raw[0].ab===1&&series.agg.length===1&&series.agg[0].ab===1&&series.agg[0].t===4;
 },id),true);
 fs.mkdirSync(path.resolve(__dirname,'../docs/screenshots'),{recursive:true});
 await page.screenshot({path:path.resolve(__dirname,'../docs/screenshots/tablet.png'),fullPage:true});

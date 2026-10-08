@@ -769,8 +769,8 @@ function tempSerialLog(raw,kind='rec'){
 
 /* ==================== 传感器噪声处理（EMA 平滑 + 去抖 + 告警记录冷却） ==================== */
 const EMA_ALPHA = 0.3;
-const DEBOUNCE_COUNT = 5;
-const ALERT_COOLDOWN_MS = 10000;
+const DEBOUNCE_MS = 3000;
+const ALERT_COOLDOWN_MS = 3000;
 const sensorRt = new Map();
 const channelSmooth = new Map();
 
@@ -781,7 +781,7 @@ function emaSmooth(prev,next,alpha){
 }
 function rtOf(id){
   let runtime=sensorRt.get(id);
-  if(!runtime){runtime={smooth:null,pendTarget:null,pendCount:0,lastLogAt:0};sensorRt.set(id,runtime);}
+  if(!runtime){runtime={smooth:null,pendTarget:null,pendSince:0,lastLogAt:0};sensorRt.set(id,runtime);}
   return runtime;
 }
 function logAlertChange(sample,previous,next,temp,id){
@@ -934,13 +934,13 @@ function applySensorData(d){
   const channel=MotionCore.temperatureChannels[d.channel];
   if(channel){
     const targets=Object.values(state.s.samples).filter(x=>x.status!=='out'&&MotionCore.categoryCodes[x.type]===channel.category);
-    targets.forEach(x=>{appendTempPoint(x.id,d.t);updateSampleSensor(x.id,d);});
+    targets.forEach(x=>{updateSampleSensor(x.id,d);appendTempPoint(x.id,d.t,x.alert==='warn'||x.alert==='bad');});
     renderRack();refreshStats();return;
   }
   let tid = null;
   if(d.id && state.s.samples[d.id]) tid = d.id;
   else if(!d.id){ const m = Object.values(state.s.samples).find(x=>x.monitor); if(m) tid = m.id; }
-  if(tid){ appendTempPoint(tid,d.t);updateSampleSensor(tid,d); }
+  if(tid){updateSampleSensor(tid,d);const sample=state.s.samples[tid];appendTempPoint(tid,d.t,sample.alert==='warn'||sample.alert==='bad');}
   renderRack();
   refreshStats();
 }
@@ -954,6 +954,7 @@ const TEMP_RAW_WINDOW_MS=30*60*1000;
 const TEMP_BUCKET_MS=60*1000;
 const TEMP_RETENTION_MS=7*24*60*60*1000;
 const TEMP_RAW_MAX=4000;
+const TEMP_ABNORMAL_MAX=130000;
 function ensureTemp(id){
   let series=state.set['templog:'+id];
   if(!series){series={raw:[],agg:[]};state.set['templog:'+id]=series;}
@@ -965,18 +966,18 @@ function rollTemp(id,now){
   while(i<series.raw.length&&series.raw[i].ts<rawCut){
     const point=series.raw[i],minute=Math.floor(point.ts/TEMP_BUCKET_MS)*TEMP_BUCKET_MS;
     const last=series.agg.length?series.agg[series.agg.length-1]:null;
-    if(last&&last.ts===minute&&typeof last.n==='number'){last.t=(last.t*last.n+point.t)/(last.n+1);last.n++;}
-    else series.agg.push({ts:minute,t:point.t,n:1});
+    if(last&&last.ts===minute&&typeof last.n==='number'){last.t=(last.t*last.n+point.t)/(last.n+1);last.n++;if(point.ab)last.ab=1;}
+    else series.agg.push({ts:minute,t:point.t,n:1,ab:point.ab?1:0});
     i++;
   }
   if(i>0)series.raw=series.raw.slice(i);
-  let j=0;while(j<series.agg.length&&series.agg[j].ts<retain)j++;
-  if(j>0)series.agg=series.agg.slice(j);
+  if(series.agg.some(point=>point.ts<retain&&!point.ab))series.agg=series.agg.filter(point=>point.ab||point.ts>=retain);
+  if(series.agg.length>TEMP_ABNORMAL_MAX)series.agg=series.agg.slice(-TEMP_ABNORMAL_MAX);
 }
-function appendTempPoint(id,temp){
+function appendTempPoint(id,temp,abnormal=false){
   if(temp==null||!Number.isFinite(temp))return;
   const series=ensureTemp(id),now=Date.now();
-  series.raw.push({ts:now,t:temp});
+  series.raw.push({ts:now,t:temp,ab:abnormal?1:0});
   if(series.raw.length>TEMP_RAW_MAX)series.raw=series.raw.slice(-TEMP_RAW_MAX);
   rollTemp(id,now);
   if($('#view-monitor').classList.contains('active') && id === monitorSelId) renderMonitorCharts();
@@ -1004,12 +1005,11 @@ function updateSampleSensor(id, d){
     else if(t>hi-2.5||t<lo+2.5)target='warn';
   }
   const current=x.alert||'good';
-  if(target===current){runtime.pendTarget=null;runtime.pendCount=0;}
-  else if(runtime.pendTarget===target)runtime.pendCount++;
-  else{runtime.pendTarget=target;runtime.pendCount=1;}
-  const fire=runtime.pendTarget!=null&&runtime.pendCount>=DEBOUNCE_COUNT;
+  if(target===current){runtime.pendTarget=null;runtime.pendSince=0;}
+  else if(runtime.pendTarget!==target){runtime.pendTarget=target;runtime.pendSince=Date.now();}
+  const fire=runtime.pendTarget!=null&&Date.now()-runtime.pendSince>=DEBOUNCE_MS;
   if(fire){
-    const previous=current;x.alert=runtime.pendTarget;runtime.pendTarget=null;runtime.pendCount=0;
+    const previous=current;x.alert=runtime.pendTarget;runtime.pendTarget=null;runtime.pendSince=0;
     logAlertChange(x,previous,x.alert,t,id);saveAll();
   }else scheduleSensorSave();
   recomputeStats();
