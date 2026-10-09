@@ -6,17 +6,25 @@
 #   [4] 重启应用    强制停止后重新打开
 #   [5] 截图        adb pull 一张当前界面到桌面
 #   [6] 日志        实时 logcat（VitalsWeb / VitalsDB / VitalsUpdate）
+#   [7] 转屏        横屏 / 竖屏切换（平板竖屏走 64px 紧凑侧栏）
 #   [0] 退出        （模拟器窗口继续保留）
+#
+# 屏幕尺寸：默认使用平板档 vitals-tablet（Pixel Tablet 2560×1600 @320dpi
+#   → 横向 CSS 视口 1280×716，命中 >1100px 的完整平板布局：224px 侧栏 + 4 列卡片；
+#     竖向 800×1196，自动降级为 64px 图标侧栏 + 2 列卡片）。
+#   要跑手机档：-Avd vitals-test（1080×2340 @440dpi → 429×943 手机布局）。
 [CmdletBinding()]
 param(
-    [string]$Action,            # 跳过菜单直接执行：mirror | rebuild | test | restart | shot | log
+    [string]$Action,            # 跳过菜单直接执行：mirror | rebuild | test | restart | shot | log | rotate
+    [string]$Avd = 'vitals-tablet',  # 模拟器档：vitals-tablet（平板，默认）/ vitals-test（手机）
+    [ValidateSet('landscape', 'portrait', '')][string]$Orientation = '',
     [switch]$NoInstall,         # 只确保窗口，不重装 APK
     [switch]$Quiet              # 少输出
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot          # vitals-android/
-$avdName = 'vitals-test'
+$avdName = $Avd
 $pkg = 'com.vitals.android'
 $activity = "$pkg/.MainActivity"
 
@@ -105,7 +113,10 @@ function Ensure-Emulator {
         Start-Sleep -Seconds 2
     }
     Invoke-Adb -s $serial shell wm dismiss-keyguard | Out-Null
+    $size = (Invoke-Adb -s $serial shell wm size).Trim() -replace "`r?`n", ' '
+    $density = (Invoke-Adb -s $serial shell wm density).Trim() -replace "`r?`n", ' '
     Write-Ok "系统已就绪：$serial"
+    Write-Host "      $size / $density" -ForegroundColor DarkGray
     return $serial
 }
 
@@ -182,6 +193,26 @@ function Show-Log($serial) {
     finally { $ErrorActionPreference = $previous }
 }
 
+# ---------------- 7) 转屏 ----------------
+function Set-Orientation($serial, $mode) {
+    # 关掉自动旋转后固定方向。注意 Pixel Tablet 原生就是横屏：user_rotation=0 横屏、1 竖屏。
+    # 竖屏会让 CSS 视口降到 800px，自动切到 64px 紧凑侧栏 + 2 列卡片。
+    Invoke-Adb -s $serial shell settings put system accelerometer_rotation 0 | Out-Null
+    $rotation = if ($mode -eq 'portrait') { 1 } else { 0 }
+    Invoke-Adb -s $serial shell settings put system user_rotation $rotation | Out-Null
+    Start-Sleep -Seconds 5
+    $label = if ($mode -eq 'portrait') { '竖屏' } else { '横屏' }
+    Write-Ok "已切换到${label}（想恢复自动旋转：设置 → 显示 → 自动旋转屏幕）"
+}
+function Get-Orientation($serial) {
+    $value = (Invoke-Adb -s $serial shell settings get system user_rotation).Trim()
+    if ($value -eq '1') { return 'portrait' } else { return 'landscape' }
+}
+function Toggle-Orientation($serial) {
+    $current = Get-Orientation $serial
+    if ($current -eq 'portrait') { Set-Orientation $serial 'landscape' } else { Set-Orientation $serial 'portrait' }
+}
+
 # ---------------- 聚焦窗口 ----------------
 function Focus-Emulator {
     $procs = Get-Process -Name qemu-system-x86_64 -ErrorAction SilentlyContinue
@@ -215,13 +246,15 @@ function Show-Menu($serial) {
     Write-Host '  │  4  重启应用                                │' -ForegroundColor White
     Write-Host '  │  5  截图       保存到桌面                    │' -ForegroundColor White
     Write-Host '  │  6  日志       实时 logcat                   │' -ForegroundColor White
+    Write-Host '  │  7  转屏       横屏 / 竖屏                   │' -ForegroundColor White
     Write-Host '  │  0  退出       模拟器窗口保持打开             │' -ForegroundColor White
     Write-Host '  └────────────────────────────────────────────┘' -ForegroundColor DarkGray
-    Write-Host "   设备 $serial   包名 $pkg" -ForegroundColor DarkGray
+    Write-Host "   设备 $serial   档位 $avdName   包名 $pkg" -ForegroundColor DarkGray
 }
 
 # ---------------- 主流程 ----------------
 $serial = Ensure-Emulator
+if ($Orientation) { Set-Orientation $serial $Orientation }
 if (-not $NoInstall) { Install-And-Start $serial $false }
 
 switch ($Action) {
@@ -231,6 +264,7 @@ switch ($Action) {
     'restart' { Install-And-Start $serial $true; exit 0 }
     'shot'    { Save-Screenshot $serial; exit 0 }
     'log'     { Show-Log $serial; exit 0 }
+    'rotate'  { Toggle-Orientation $serial; exit 0 }
 }
 
 Focus-Emulator
@@ -244,7 +278,8 @@ while ($true) {
         '4' { Install-And-Start $serial $true }
         '5' { Save-Screenshot $serial }
         '6' { Show-Log $serial }
+        '7' { Toggle-Orientation $serial }
         '0' { Write-Host '  已退出（模拟器窗口仍在运行）。' -ForegroundColor DarkGray; exit 0 }
-        default { Write-Warn '请输入 0-6' }
+        default { Write-Warn '请输入 0-7' }
     }
 }

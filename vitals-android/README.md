@@ -14,7 +14,32 @@
 | 4 重启应用 | 强制停止后重新打开 |
 | 5 截图 | 当前界面存到桌面（`adb pull`，二进制安全） |
 | 6 日志 | 实时 logcat：`VitalsWeb` / `VitalsDB` / `VitalsUpdate` |
+| 7 转屏 | 横屏 / 竖屏切换（观察响应式降级） |
 | 0 退出 | 退出菜单，模拟器窗口保持打开 |
+
+### 屏幕尺寸（实际产品是平板）
+
+默认档 **`vitals-tablet`＝Pixel Tablet 2560×1600 @320dpi**，与实际平板一致：
+
+| 方向 | 物理分辨率 | CSS 视口 | 命中布局 |
+| --- | --- | --- | --- |
+| 横屏（默认） | 2560×1600 | **1280×716** | >1100px 完整平板：224px 侧栏 + 概览 4 列卡片 + 2 列网格 |
+| 竖屏 | 1600×2560 | **800×1196** | 64px 图标侧栏 + 2 列卡片（图表与列表单列自然排布） |
+
+想跑手机档（验证窄屏降级，1080×2340 @440dpi → CSS 429×943）：
+
+```powershell
+.\tools\生息样本库-测试台.bat mirror -Avd vitals-test
+```
+
+也可以固定方向启动：
+
+```powershell
+.\tools\生息样本库-测试台.bat mirror -Orientation portrait
+```
+
+验证视口与断点的辅助脚本：`.local-ci\inspect-webview.mjs`（通过 Chrome DevTools 协议直连 WebView，
+打印 CSS 视口、侧栏宽度、卡片列数与各滚动容器的 `clientHeight/scrollHeight`，用于判断是否有内容被裁切）。
 
 也可以跳过菜单直接调用：
 
