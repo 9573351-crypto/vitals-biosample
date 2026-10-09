@@ -25,6 +25,8 @@ captures/
 .local-ci/backup-format-check/out/
 .local-ci/*.tmp
 .local-ci/debug-*.mjs
+.local-ci/instrument-*.txt
+.local-ci/device-test.apk
 *.zip
 *.7z
 *.rar
