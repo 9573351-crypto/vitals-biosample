@@ -485,7 +485,7 @@
     },
 
     /* ---- 更新（网页预览：只读查询 GitHub，不具备安装能力） ---- */
-    getAppVersion() { return j({ version: '1.20.0', versionCode: 34, repo: REPO_SLUG, simulated: true }); },
+    getAppVersion() { return j({ version: '1.20.1', versionCode: 35, repo: REPO_SLUG, simulated: true }); },
     checkUpdate() {
       try {
         const url = 'https://api.github.com/repos/' + REPO_SLUG + '/releases/latest';

@@ -107,6 +107,9 @@ public final class VitalsDbHelper extends SQLiteOpenHelper {
         addColumn(db,"samples","photo_hash","TEXT");
         addColumn(db,"samples","thumb","TEXT");
         if(!hasColumn(db,"records","operator")||!hasColumn(db,"records","source")||!hasColumn(db,"records","type_code"))rebuildRecords(db);
+        // 归档表必须在这里兜底：旧库升级路径（onUpgrade/onOpen）不会重新执行 createTables 的全部语句，
+        // 而 retainRecords() 会向 records_archive 写入；缺失时留存一旦触发就会抛 no such table。
+        db.execSQL("CREATE TABLE IF NOT EXISTS records_archive ("+RECORDS_COLUMNS+")");
         db.execSQL("CREATE INDEX IF NOT EXISTS records_sample_time ON records(sample_id,time)");
         db.execSQL("CREATE INDEX IF NOT EXISTS records_time ON records(time)");
         db.execSQL("CREATE INDEX IF NOT EXISTS records_type_code ON records(type_code)");
@@ -426,7 +429,15 @@ public final class VitalsDbHelper extends SQLiteOpenHelper {
         try(Cursor c=db.rawQuery("SELECT 1 FROM samples WHERE type=? AND slot=? AND sample_id<>?",new String[]{sampleType,Integer.toString(t.getInt("slot")),sid})){if(c.moveToFirst())throw new JSONException("任务圆盘槽位被其他样本占用");}
     }
     private static long revision(SQLiteDatabase db){return Long.parseLong(meta(db,"revision","0"));}
-    /** 契约 C：records 超上限时把最旧的行搬进 records_archive（同结构）再删除，在 commit/导入事务内调用。 */
+    /**
+     * 契约 C：records 超上限时把最旧的行搬进 records_archive（同结构）再删除，在 commit/导入事务内调用。
+     * <p>
+     * 这里用 {@code id ASC} 界定「最旧」，依赖下面这条调用约定：addRecords 按「最新在前」传入
+     * （前端 state.rec 用 unshift 维护，persistence.js 直接切片下发），而 commit 里为 id DESC 展示做了
+     * 倒序插入，于是「数组最后一条（最旧）」拿到最小 id、「第一条（最新）」拿到最大 id ——
+     * id 升序即时间由旧到新，按 id 归档就是按时间归档，且走主键索引。
+     * 若将来调用方改成「最旧在前」下发，必须同步调整插入方向，否则会把最新的一批归档掉。
+     */
     private void retainRecords(SQLiteDatabase db){
         long over=count(db,"records")-recordLimit;
         if(over<=0)return;

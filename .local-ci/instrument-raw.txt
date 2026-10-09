@@ -1,0 +1,43 @@
+﻿PASS USB label encoder preserves black runs and emits one print; rejects invalid size
+PASS new empty database, version and foreign keys
+PASS create sample plus linked record
+PASS update retains FK and photo/extra fields
+PASS barcode unique and parameter binding
+PASS slot range and integer validation
+PASS status and field types
+PASS inbound atomic with history
+PASS occupied slot rejects second sample
+PASS same slot number is allowed on another sample disc
+PASS record failure rolls sample update back
+PASS outbound frees slot with retained last slot
+PASS settings JSON values and read
+PASS delete parent retains history via SET NULL
+PASS stale revision and invalid FK reject
+PASS full legacy state JSON import
+PASS current backup and raw collections import
+PASS invalid import rolls back after deletes/inserts
+PASS export import preserves logical data
+PASS closed/reopened DB retains data
+PASS ambiguous legacy names remain unlinked
+PASS SQL itself enforces CHECK and NOT NULL
+PASS concurrent setting writes remain consistent
+PASS legacy DB version 0 migrates once; clearing does not resurrect
+PASS legacy DB version 1 migrates once; clearing does not resurrect
+PASS failed legacy migration retains payload and version
+PASS legacy unfinished task survives migration
+PASS 契约A 新库：照片落盘、行内清空、thumb 长边≤160
+PASS 契约A 未换图保存不清空已有照片引用
+PASS 契约B snapshot：单事务四段一致且不含全图
+PASS 契约A 照片三态：键缺省保留、null/空串清空、dataURL 覆盖
+PASS 契约C 记录新列/ISO 时间/分页/筛选/枚举约束
+FAIL java.lang.AssertionError: 批量 11 != 批量 0
+java.lang.AssertionError: 批量 11 != 批量 0
+	at com.vitals.android.DatabaseInstrumentation.eq(DatabaseInstrumentation.java:36)
+	at com.vitals.android.DatabaseInstrumentation.lambda$runTests$53(DatabaseInstrumentation.java:225)
+	at com.vitals.android.DatabaseInstrumentation.$r8$lambda$7Plrv83aH1bQ_ZpbWDdBjQyJ7A8(Unknown Source:0)
+	at com.vitals.android.DatabaseInstrumentation$$ExternalSyntheticLambda27.run(D8$$SyntheticClass:0)
+	at com.vitals.android.DatabaseInstrumentation.test(DatabaseInstrumentation.java:35)
+	at com.vitals.android.DatabaseInstrumentation.runTests(DatabaseInstrumentation.java:217)
+	at com.vitals.android.DatabaseInstrumentation.onStart(DatabaseInstrumentation.java:58)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2402)
+

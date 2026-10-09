@@ -2,6 +2,17 @@
 
 本项目的应用版本与 GitHub Release 标签（`vX.Y.Z`）保持一致；Android 端内置的一键更新会读取最新 Release 作为升级来源。
 
+## v1.20.1
+
+### 修复
+
+- **旧库升级后缺少 records_archive 表**（设备级测试发现）：该表原先只在 `createTables()` 里创建，而旧库升级路径（`onUpgrade` / `onOpen`）不会重新执行全部建表语句，导致升级设备一旦触发记录留存（超过 5000 条）就会抛 `no such table: records_archive`。现在 `ensureSchema()` 里用 `CREATE TABLE IF NOT EXISTS` 兜底。
+- 修正设备测试中记录归档用例的调用约定：`addRecords` 必须与真实前端一致按「最新在前」下发（`state.rec` 用 `unshift` 维护），并补充断言确认「最旧的两条进归档、最新一条留在 records」。该用例此前用相反顺序构造夹具，暴露的其实是测试假设与调用约定的不一致。
+
+### 验证
+
+- `connectedDebugAndroidTest`（Android 14 / API 34 模拟器）：**43/43 通过**。
+
 ## v1.20.0
 
 ### 数据存储

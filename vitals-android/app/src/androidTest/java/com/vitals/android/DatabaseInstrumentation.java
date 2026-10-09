@@ -217,12 +217,20 @@ public final class DatabaseInstrumentation extends Instrumentation {
         test("契约C records 超限归档到 records_archive",()->{
             String n=fresh();VitalsDbHelper r=new VitalsDbHelper(getTargetContext(),n);r.recordLimit=10;
             r.saveSample(sample("R1","R1"),null);
+            // 调用约定：addRecords 与真实前端一致按「最新在前」下发（state.rec 用 unshift 维护），
+            // 因此这里也倒序遍历，让「批量 0」（08:00，最旧）位于数组末尾、拿到最小 id。
             JSONArray adds=new JSONArray();
-            for(int i=0;i<12;i++)adds.put(rec("R1").put("time","2026-10-09T08:"+String.format(Locale.ROOT,"%02d",i)).put("detail","批量 "+i));
+            for(int i=11;i>=0;i--)adds.put(rec("R1").put("time","2026-10-09T08:"+String.format(Locale.ROOT,"%02d",i)).put("detail","批量 "+i));
             r.commit(new JSONObject().put("addRecords",adds));
             eq(r.getRecords(null).length(),10);
+            // saveSample(...,null) 不写记录，所以这里只有 12 条批量：上限 10 → 归档 2 条
             try(Cursor c=r.getReadableDatabase().rawQuery("SELECT COUNT(*) FROM records_archive",null)){c.moveToFirst();eq(c.getLong(0),2);}
-            try(Cursor c=r.getReadableDatabase().rawQuery("SELECT detail FROM records_archive ORDER BY id ASC",null)){c.moveToFirst();eq(c.getString(0),"批量 0");}
+            // 倒序插入让最新在前数组的最后一条（批量 0＝08:00，最旧）拿到最小 id；按 id 升序归档即归档最旧
+            // 于是「批量 0」「批量 1」进归档，最新的一条「批量 11」必须留在 records 里
+            try(Cursor c=r.getReadableDatabase().rawQuery("SELECT detail FROM records_archive ORDER BY id ASC",null)){c.moveToFirst();eq(c.getString(0),"批量 0");c.moveToNext();eq(c.getString(0),"批量 1");}
+            String newest="";
+            try(Cursor c=r.getReadableDatabase().rawQuery("SELECT detail FROM records ORDER BY id DESC LIMIT 1",null)){if(c.moveToFirst())newest=c.getString(0);}
+            eq(newest,"批量 11"); // 最新的一条必须留在 records 里
             r.close();
         });
         test("契约D env 上限 2000：分钟聚合 + 最近 200 点原样",()->{
