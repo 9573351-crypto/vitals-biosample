@@ -1,5 +1,35 @@
 # 生息样本库 · 安卓迁移版
 
+## 模拟器测试（tools/）
+
+在没有真机时用 Android 模拟器验证。首次使用需要安装一次硬件加速驱动（AEHD），**必须管理员权限**：
+
+```powershell
+# 方式一：右键 tools\install-hypervisor.ps1「以管理员身份运行」
+# 方式二：在普通 PowerShell 里发起提权（会弹 UAC，点「是」）
+Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','D:\PROJECT\VITALS\vitals-android\tools\install-hypervisor.ps1'
+```
+
+装好后即可使用（仓库根目录的桌面快捷方式与此等价）：
+
+| 脚本 | 用途 |
+| --- | --- |
+| `tools\启动模拟器.bat` | 启动无窗口模拟器（AVD `vitals-test`）→ 等待开机 → 安装最新 APK → 打开应用 |
+| `tools\重新构建并安装.bat` | 重新构建 debug APK → 安装到模拟器 → 重启应用并截图 `tools\最新界面.png` |
+| `tools\运行设备测试.bat` | 运行 `connectedDebugAndroidTest`（设备级数据库测试，结果写入 `docs\database-test-results.txt`） |
+
+`tools\emulator-launch.ps1` 是启动器的实现，支持 `-Window`（显示图形窗口）与 `-NoInstall`（只启动不装包）。
+常用 adb 操作：
+
+```powershell
+adb devices                                    # 确认 emulator-5554 在线
+adb -s emulator-5554 exec-out screencap -p > shot.png
+adb -s emulator-5554 logcat -s VitalsWeb VitalsDB VitalsUpdate
+adb -s emulator-5554 shell                     # 进入设备 shell
+```
+
+> 说明：`.ps1` 必须保存为 **UTF-8 with BOM**，否则 Windows PowerShell 5.1 会按 ANSI 读取中文注释而解析失败。
+
 ## 1.19.0 一体机内部自动备份
 
 设置页新增「一体机内部自动备份」。首次使用时在 Android 系统目录选择器中选择一体机内部存储目录；以后样本、记录或设置成功变更后，应用会在 5 秒防抖后生成完整 JSON 备份。应用启动且距离上次成功备份超过 24 小时时会自动补做一次，目录内只保留最近 30 份。可随时立即备份或关闭自动备份，关闭不会删除已有文件，不需要 U 盘。
