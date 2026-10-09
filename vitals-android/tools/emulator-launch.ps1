@@ -106,6 +106,6 @@ Write-Host 'Launching com.vitals.android ...'
 Write-Host ''
 Write-Host "READY. Device: $serial" -ForegroundColor Green
 Write-Host 'Useful commands:'
-Write-Host "  screenshot : & '$adb' -s $serial exec-out screencap -p > shot.png"
+Write-Host "  screenshot : & '$adb' -s $serial shell screencap -p /sdcard/shot.png; & '$adb' -s $serial pull /sdcard/shot.png shot.png"
 Write-Host "  logcat     : & '$adb' -s $serial logcat -s VitalsWeb VitalsDB VitalsUpdate"
 Write-Host "  shell      : & '$adb' -s $serial shell"

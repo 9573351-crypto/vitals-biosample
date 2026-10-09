@@ -52,7 +52,9 @@ if errorlevel 1 ( echo [FAILED] install error & pause & exit /b 1 )
 echo [4/4] Launching app and taking a screenshot...
 "%ADB%" shell am start -n com.vitals.android/.MainActivity >nul
 timeout /t 6 /nobreak >nul
-"%ADB%" exec-out screencap -p > "%HERE%最新界面.png"
+"%ADB%" shell screencap -p /sdcard/vitals-shot.png
+"%ADB%" pull /sdcard/vitals-shot.png "%HERE%最新界面.png"
+"%ADB%" shell rm -f /sdcard/vitals-shot.png
 
 echo.
 echo [OK] Done. Screenshot: %HERE%最新界面.png
