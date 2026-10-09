@@ -1,32 +1,51 @@
 # 生息样本库 · 安卓迁移版
 
-## 模拟器测试（tools/）
+## 测试台（单一入口）
 
-在没有真机时用 Android 模拟器验证。首次使用需要安装一次硬件加速驱动（AEHD），**必须管理员权限**：
+桌面上只有一个入口：**「生息样本库 · 测试台」**（指向 `tools\生息样本库-测试台.bat`）。
+打开后会先确保 **模拟器窗口** 在运行（那就是安卓端的实时画面，可直接用鼠标操作），
+再自动安装最新 APK 并打开应用，然后给出菜单：
+
+| 菜单项 | 作用 |
+| --- | --- |
+| 1 实时镜像 | 打开/聚焦模拟器窗口（默认动作，实时、可交互） |
+| 2 重新构建 | 构建 debug APK → 安装 → 重启应用（改完代码用这个） |
+| 3 设备测试 | 运行设备级数据库测试（43 条断言），打印通过/失败数 |
+| 4 重启应用 | 强制停止后重新打开 |
+| 5 截图 | 当前界面存到桌面（`adb pull`，二进制安全） |
+| 6 日志 | 实时 logcat：`VitalsWeb` / `VitalsDB` / `VitalsUpdate` |
+| 0 退出 | 退出菜单，模拟器窗口保持打开 |
+
+也可以跳过菜单直接调用：
 
 ```powershell
-# 方式一：右键 tools\install-hypervisor.ps1「以管理员身份运行」
-# 方式二：在普通 PowerShell 里发起提权（会弹 UAC，点「是」）
+.\tools\生息样本库-测试台.bat mirror     # 只确保窗口并聚焦
+.\tools\生息样本库-测试台.bat rebuild    # 构建 + 安装 + 重启
+.\tools\生息样本库-测试台.bat test       # 设备级测试
+.\tools\生息样本库-测试台.bat restart    # 重开应用
+.\tools\生息样本库-测试台.bat shot       # 截图到桌面
+.\tools\生息样本库-测试台.bat log        # 实时日志
+```
+
+实现是 `tools\vitals-test.ps1`。首次使用需安装一次硬件加速驱动（AEHD），**必须管理员权限**：
+
+```powershell
+# 右键 tools\install-hypervisor.ps1「以管理员身份运行」，或：
 Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','D:\PROJECT\VITALS\vitals-android\tools\install-hypervisor.ps1'
 ```
 
-装好后即可使用（仓库根目录的桌面快捷方式与此等价）：
-
-| 脚本 | 用途 |
-| --- | --- |
-| `tools\启动模拟器.bat` | 启动无窗口模拟器（AVD `vitals-test`）→ 等待开机 → 安装最新 APK → 打开应用 |
-| `tools\重新构建并安装.bat` | 重新构建 debug APK → 安装到模拟器 → 重启应用并截图 `tools\最新界面.png` |
-| `tools\运行设备测试.bat` | 运行 `connectedDebugAndroidTest`（设备级数据库测试，结果写入 `docs\database-test-results.txt`） |
-
-`tools\emulator-launch.ps1` 是启动器的实现，支持 `-Window`（显示图形窗口）与 `-NoInstall`（只启动不装包）。
-常用 adb 操作：
+常用 adb 操作（测试台已封装大部分）：
 
 ```powershell
-adb devices                                    # 确认 emulator-5554 在线
-adb -s emulator-5554 exec-out screencap -p > shot.png
+adb devices                                              # 确认 emulator-5554 在线
+adb -s emulator-5554 shell screencap -p /sdcard/s.png    # 截图（> 重定向会破坏 PNG，务必用 pull）
+adb -s emulator-5554 pull /sdcard/s.png shot.png
 adb -s emulator-5554 logcat -s VitalsWeb VitalsDB VitalsUpdate
-adb -s emulator-5554 shell                     # 进入设备 shell
+adb -s emulator-5554 shell                               # 进入设备 shell
 ```
+
+> 注：`tools\emulator-launch.ps1`（无窗口/窗口启动）与 `install-hypervisor.ps1` 仍保留，
+> 供脚本化调用；日常使用走上面的测试台即可。
 
 > 说明：`.ps1` 必须保存为 **UTF-8 with BOM**，否则 Windows PowerShell 5.1 会按 ANSI 读取中文注释而解析失败。
 
