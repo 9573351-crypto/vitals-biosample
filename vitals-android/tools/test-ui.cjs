@@ -1,5 +1,32 @@
-const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
-const {chromium}=require(process.env.PLAYWRIGHT_PATH||'C:/Users/lvyiy/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict');
+// Playwright 的安装位置因机器而异，且本测试只是可选回归项：
+// 依次尝试 PLAYWRIGHT_PATH → 正常 require → 常见缓存/全局目录 → NODE_PATH 与向上查找 node_modules；
+// 全部失败时打印可读提示并以退出码 0 跳过，不阻塞其他测试。
+function loadChromium(){
+ const tried=[];
+ const attempt=spec=>{try{const mod=require(spec);if(mod&&mod.chromium)return mod.chromium;tried.push(spec+' → 未导出 chromium');}catch(e){tried.push(spec+' → '+((e&&e.code)||(e&&e.message)||String(e)));}return null;};
+ if(process.env.PLAYWRIGHT_PATH){const c=attempt(process.env.PLAYWRIGHT_PATH);if(c)return c;}
+ for(const spec of ['playwright','playwright-core']){try{const c=attempt(require.resolve(spec));if(c)return c;}catch(e){tried.push(spec+' → '+((e&&e.code)||String(e)));}}
+ const candidates=[
+  path.join(os.homedir(),'.cache','codex-runtimes','codex-primary-runtime','dependencies','node','node_modules','playwright'),
+  path.join(os.homedir(),'AppData','Roaming','npm','node_modules','playwright'),
+  path.join(os.homedir(),'.npm-global','lib','node_modules','playwright'),
+  '/usr/local/lib/node_modules/playwright',
+  '/usr/lib/node_modules/playwright'
+ ];
+ for(const root of [process.cwd(),__dirname]){
+  let dir=root;
+  for(let i=0;i<6;i++){candidates.push(path.join(dir,'node_modules','playwright'));const parent=path.dirname(dir);if(parent===dir)break;dir=parent;}
+ }
+ for(const entry of (process.env.NODE_PATH||'').split(path.delimiter).filter(Boolean))candidates.push(path.join(entry,'playwright'));
+ for(const candidate of [...new Set(candidates)]){const c=attempt(candidate);if(c)return c;}
+ console.log('SKIP: 未找到 playwright 模块，跳过界面回归测试（退出码 0，不阻塞其他测试）。');
+ console.log('      处理方式：设置 PLAYWRIGHT_PATH 指向 playwright 目录，或在仓库执行 npm i -D playwright / npm i -g playwright。');
+ for(const line of tried)console.log('      已尝试 '+line);
+ return null;
+}
+const chromium=loadChromium();
+if(!chromium)process.exit(0);
 const root=path.resolve(__dirname,'../app/src/main/assets/web');
 (async()=>{
 const server=http.createServer((req,res)=>{try{let name=decodeURIComponent(req.url.split('?')[0]);if(name==='/')name='/index.html';const p=path.join(root,name);if(!p.startsWith(root))throw Error();res.setHeader('Content-Type',p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.html')?'text/html':'image/png');res.end(fs.readFileSync(p));}catch{res.statusCode=404;res.end();}});

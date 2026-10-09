@@ -1,0 +1,1 @@
+UPDATE records SET time=replace(time,' ','T') WHERE time LIKE '____-__-__ __:__';

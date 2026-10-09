@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     构建 Debug APK，并按「Vitals-Android-<版本>.apk」约定输出到 output\。
 

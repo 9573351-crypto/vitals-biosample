@@ -1,0 +1,63 @@
+{
+  "app": "vitals-biosample",
+  "schemaVersion": 4,
+  "appVersion": "1.19.3",
+  "exportedAt": "2026-10-09T08:00:00+08:00",
+  "counts": {
+    "samples": 1,
+    "records": 1
+  },
+  "checksum": "sha256:ac466995c1218639510af546650ce86f6fcac23c80f5b3f3da0680418bb79398",
+  "samples": {
+    "SB-10002": {
+      "id": "SB-10002",
+      "name": "全血样本-02",
+      "code": "SB-90002",
+      "type": "全血",
+      "status": "in",
+      "slot": 1,
+      "loc": "圆盘-0",
+      "timeTxt": "2026-10-09 08:00",
+      "timeRaw": "2026-10-09T08:00",
+      "temp": 4.2,
+      "monitor": false,
+      "alert": "good",
+      "createdAt": 1759968000000,
+      "updatedAt": 1759968000000,
+      "pendingIntake": false,
+      "env": [
+        {
+          "time": "2026-10-09T08:00",
+          "temp": 4.2
+        },
+        {
+          "time": "2026-10-09T08:01",
+          "temp": 4.3
+        }
+      ]
+    }
+  },
+  "records": [
+    {
+      "recordId": 3,
+      "sampleId": "SB-10002",
+      "sample": "全血样本-02",
+      "time": "2026-10-09T08:00",
+      "type": "入库",
+      "detail": "夹具记录 3",
+      "code": "SB-90003",
+      "slot": 1,
+      "status": "in",
+      "taskId": "T-FIXTURE-3",
+      "source": "manual",
+      "type_code": "in",
+      "operator": "夹具"
+    }
+  ],
+  "settings": {
+    "hi": 8,
+    "lo": -88,
+    "simOn": false,
+    "online": 0
+  }
+}

@@ -1,6 +1,14 @@
 // Runs only against an already-running emulator, never selects a physical device.
 const {execFileSync}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const adb='D:/android-studio/SDK/platform-tools/adb.exe';
+// adb 位置不再写死本机路径：共享 adb-locate.cjs，按 ANDROID_HOME / ANDROID_SDK_ROOT /
+// 工程 local.properties 的 sdk.dir 推导，最后回退常见安装目录。JDK 由 Gradle 使用，本脚本不需要。
+const {resolveAdb,ADB_HELP}=require('./adb-locate.cjs');
+const adb=resolveAdb(path.resolve(__dirname,'..'));
+if(!adb){
+ console.error(ADB_HELP);
+ console.error('本测试还需要一个已在运行的模拟器（固定使用 emulator-5554）以及预先安装的 debug APK。');
+ process.exit(1);
+}
 const cmd=(...args)=>execFileSync(adb,['-s','emulator-5554',...args],{encoding:'utf8'}).trim();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function connect(){
@@ -83,6 +91,6 @@ cmd('shell','screencap','-p','/sdcard/vitals-test.png');cmd('pull','/sdcard/vita
 // Optional interactive session: clearly marked emulator-only data, never packaged in APK.
 if(process.argv.includes('--keep-demo')){
  await page.eval(`state.s.samples.MIGRATION1.name='模拟器演示 · 血清';state.s.samples.MIGRATION1.note='仅用于虚拟机调试，非真实样本';state.s.samples.MIGRATION1.slot=1;state.s.samples.MIGRATION1.loc='圆盘-1';saveAll();reloadUI();goView('library');`);
-}else await page.eval(`state=Store.defaultsShort();state.s.samplesSeeded=true;saveAll();reloadUI();`);
+}else await page.eval(`state=Store.clearAll({hi:8,lo:-88});state.s.samplesSeeded=true;saveAll();reloadUI();`);
 page.close();console.log('PASS: Android startup, SQLite, native revision conflict recovery during feedback/completion, zero temperature limit and invalid bounds, manual in/out, wrong-scan rejection, simulated ACK/arrival, sensor validation, unfinished-task recovery, import, no-device feedback.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

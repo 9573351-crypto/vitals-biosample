@@ -1,6 +1,14 @@
 // Back up/restore simulator vitals.db around interactive tests; physical devices are never selected.
 const fs=require('node:fs'),path=require('node:path'),{execFileSync,spawnSync}=require('node:child_process');
-const adb='D:/android-studio/SDK/platform-tools/adb.exe',root=path.resolve(__dirname,'..');
+const {resolveAdb,ADB_HELP}=require('./adb-locate.cjs');
+const root=path.resolve(__dirname,'..');
+// adb 位置同样不写死：与 test-android.cjs 共用推导逻辑；缺 adb 时跳过而不是报错。
+const adb=resolveAdb(root);
+if(!adb){
+ console.error(ADB_HELP);
+ console.error('本脚本需要在运行的模拟器上做 vitals.db 备份/还原，已跳过（退出码 0）。');
+ process.exit(0);
+}
 const cmd=(...a)=>execFileSync(adb,['-s','emulator-5554',...a],{encoding:'utf8'}).trim();
 const save=path.join(root,'docs/schema-refactor-baseline/emulator-before-ui.db');
 cmd('shell','am','force-stop','com.vitals.android');

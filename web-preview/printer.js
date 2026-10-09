@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!window.AndroidHost||!AndroidHost.connectLabelPrinter){find('usbPrinterStatus').textContent='请安装支持 USB 打印的安卓版本';return;}
     find('usbPrinterStatus').textContent='正在连接，请允许 USB 访问…';AndroidHost.connectLabelPrinter();
   };
-  find('systemPrint').onclick=()=>{if(!busy){dialog.classList.remove('open');AndroidHost.printLabel();}};
+  find('systemPrint').onclick=()=>{if(!busy){dialog.classList.remove('open');AndroidHost.printLabel();if(sample&&typeof window.markLabelPrinted==='function')window.markLabelPrinted(sample.id);}};
   find('usbPrintSend').onclick=()=>{
     update();if(!preview||busy||!find('labelPaperReady').checked)return;
     if(!window.AndroidHost||!AndroidHost.printUsbLabel){find('usbPrinterStatus').textContent='当前版本不支持 USB 打印';return;}
@@ -88,6 +88,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     find('usbPrinterStatus').textContent=text;
     const deviceStatus=$('#devicePrinterStatus');
     if(deviceStatus){deviceStatus.textContent=text;deviceStatus.classList.toggle('on',type==='ready'||type==='sent');}
+    // 打印成功后重新冻结标签信息卡，避免重复提示「标签信息已过期」
+    if(type==='sent'&&sample&&typeof window.markLabelPrinted==='function')window.markLabelPrinted(sample.id);
     if(type==='sent'||type==='error'){
       busy=false;find('usbPrintClose').disabled=false;find('usbPrinterConnect').disabled=false;find('systemPrint').disabled=false;inputs.forEach(i=>i.disabled=false);find('labelPaperReady').disabled=false;find('labelPaperReady').checked=false;update();
     }

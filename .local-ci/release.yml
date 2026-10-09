@@ -1,0 +1,68 @@
+name: Release APK
+
+# 推送形如 v1.10.0 的标签时自动构建 APK 并发布 Release。
+# 资产命名必须是 Vitals-Android-<版本号>.apk —— 应用内置的一键更新据此定位安装包。
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的版本标签（例如 v1.10.1），留空则仅构建产物'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Read versionName
+        id: version
+        run: |
+          VERSION=$(grep -oP "versionName\s+'\K[^']+" vitals-android/app/build.gradle)
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "检测到 versionName=$VERSION"
+
+      - name: Build debug APK
+        working-directory: vitals-android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Stage release asset
+        run: |
+          mkdir -p output
+          cp vitals-android/app/build/outputs/apk/debug/app-debug.apk \
+             "output/Vitals-Android-${{ steps.version.outputs.name }}.apk"
+          ls -l output
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vitals-Android-${{ steps.version.outputs.name }}
+          path: output/*.apk
+
+      - name: Publish Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release create "$TAG" "output/Vitals-Android-${{ steps.version.outputs.name }}.apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --notes "由 GitHub Actions 构建发布；应用内「一键更新」将读取本 Release 的 APK 资产。"

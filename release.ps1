@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     构建 Android APK 并发布到 GitHub Release，供应用内置的「一键更新」使用。
 

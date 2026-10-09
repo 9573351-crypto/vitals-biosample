@@ -215,6 +215,53 @@ node .\tools\test-android-preserved.cjs
 
 `tools/migrate.cjs` 和 `tools/refactor-persistence.cjs` 仅记录一次性源码改造过程，不要在已修改副本上反复运行。安装后的数据库升级由 VitalsDbHelper 自动执行，不依赖这些脚本。
 
+## 开发约定
+
+### 1. 两份前端副本必须同步
+
+同一套前端同时存在两处，除白名单外必须逐字节一致：
+
+- `app/src/main/assets/web/`（随 APK 打包）
+- 仓库根目录的 `web-preview/`（浏览器预览版）
+
+```powershell
+cd ..
+node vitals-android/tools/sync-assets.mjs          # 校验；有差异时退出码 1，输出「文件: 差异类型」
+node vitals-android/tools/sync-assets.mjs --fix    # 用 assets 侧覆盖 web-preview 侧的白名单外文件
+```
+
+白名单（允许不同）：`index.html`、`web-bridge.js`、`web-preview.css`、`.update-styles.tmp.css`。
+`web-preview/tools/`（如 `verify-preview.mjs`）是预览专属工具目录，不参与比较。
+
+### 2. 桥契约变更必须同时改三处
+
+`MainActivity.java` / `VitalsDbHelper.java` 中 `@JavascriptInterface` 的签名一旦变更（新增、改名、参数或返回结构变化），必须同步：
+
+1. 原生实现（`MainActivity.java` / `VitalsDbHelper.java`）；
+2. 两份前端副本（`app/src/main/assets/web` 与 `web-preview`，含所有调用点与 `persistence.js`）；
+3. 数据字典 [docs/DATA-DICTIONARY.md](docs/DATA-DICTIONARY.md)——列定义、枚举值、时间格式与桥方法映射。
+
+新增 `samples` / `records` 列时，除了 DDL 还要同步 `VitalsDbHelper` 内的 `JS[]` / `SQL[]` 映射数组，否则字段会落进 `extra_json`。
+
+### 3. 测试工具的路径自动推导
+
+- `tools/test-ui.cjs`：playwright 依次尝试 `PLAYWRIGHT_PATH`、`require.resolve('playwright')`、常见缓存与全局目录；全部失败时打印提示并以退出码 0 跳过，不阻塞其他测试。
+- `tools/test-android.cjs` / `tools/test-db.ps1`：`adb` 从 `ANDROID_HOME` / `ANDROID_SDK_ROOT` / 本目录 `local.properties` 的 `sdk.dir` 推导，找不到时给出可读提示；不再需要改脚本常量。
+- `.ps1` 一律保存为 **UTF-8 with BOM**：Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读取，中文注释与提示可能导致解析失败（`test-db.ps1`、`build-apk.ps1`、`release.ps1` 均适用）。
+
+### 4. 发版流程
+
+```powershell
+cd vitals-android
+powershell -ExecutionPolicy Bypass -File .\build-apk.ps1   # 构建 → output\Vitals-Android-<版本>.apk
+cd ..
+.\release.ps1                                             # 读取 versionName，构建并发布到 GitHub Release
+.\release.ps1 -SkipBuild                                  # 只上传已有 APK
+```
+
+发布前先跑 `cd vitals-android; node tools\sync-assets.mjs`、`node tools\updater.test.mjs`、`node tools\test-core.cjs`。
+版本号只改 `app/build.gradle` 的 `versionName` / `versionCode`；Release 资产名必须是 `Vitals-Android-<versionName>.apk`。
+
 ## 验证边界
 
 自动测试覆盖界面基本操作、扫码不匹配拦截、槽位冲突、导出、任务恢复、ACK／到位区分和备份格式校验。XW9901 摄像头和打印机连接已验证；电机、传感器实物联调与装纸后的打印验收尚未完成。

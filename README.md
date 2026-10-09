@@ -4,7 +4,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 当前版本 | **1.19.2**（versionCode 33） |
+| 当前版本 | **1.20.0**（versionCode 34） |
 | 包名 | `com.vitals.android` |
 | 形态 | Android 应用（WebView + JS 桥 + SQLite），`web-preview/` 为浏览器预览版 |
 | 更新来源 | 本仓库的 GitHub Release |
@@ -58,7 +58,54 @@ node tools\test-core.cjs        # 核心逻辑（无需设备）
 node tools\updater.test.mjs     # 一键更新：入口、状态机、原生调用参数
 ```
 
-`tools\test-ui.cjs` 需要本机可用的 Playwright；`tools\test-db.ps1` 与 `tools\test-android.cjs` 需要模拟器与 `adb`，请按本机路径调整其中的常量。
+`tools\test-ui.cjs` 需要本机可用的 Playwright；`tools\test-db.ps1` 与 `tools\test-android.cjs` 需要模拟器与 `adb`。三者都会自动推导工具路径（见下节「开发约定」），无需再改脚本里的常量。
+
+---
+
+## 开发约定
+
+### 1. 两份前端副本必须同步
+
+同一套前端同时存在两处，除白名单外必须逐字节一致，否则 APK 与网页预览版会行为漂移：
+
+- `vitals-android/app/src/main/assets/web/`（随 APK 打包）
+- `web-preview/`（浏览器预览版）
+
+```powershell
+node vitals-android/tools/sync-assets.mjs          # 校验两份副本；有差异时退出码 1 并打印「文件: 差异类型」
+node vitals-android/tools/sync-assets.mjs --fix    # 用 assets 侧覆盖 web-preview 侧的白名单外文件
+```
+
+白名单（允许不同）：`index.html`、`web-bridge.js`、`web-preview.css`、`.update-styles.tmp.css`。
+`web-preview/tools/` 是预览专属工具目录，不参与比较。
+
+### 2. 桥契约变更必须同时改三处
+
+`MainActivity.java` / `VitalsDbHelper.java` 中 `@JavascriptInterface` 的签名一旦变更，必须同步更新：
+
+1. 原生实现；
+2. 两份前端副本（`assets/web` 与 `web-preview`，以及所有调用点）；
+3. 数据字典 [vitals-android/docs/DATA-DICTIONARY.md](vitals-android/docs/DATA-DICTIONARY.md)——列定义、枚举值与桥方法映射。
+
+### 3. 测试工具的路径自动推导
+
+`tools/test-ui.cjs` 依次尝试 `PLAYWRIGHT_PATH`、`require.resolve('playwright')` 与常见缓存/全局目录，全部失败时打印提示并以退出码 0 跳过（不阻塞其他测试）。
+`tools/test-android.cjs` 与 `tools/test-db.ps1` 从 `ANDROID_HOME` / `ANDROID_SDK_ROOT` / `vitals-android/local.properties` 的 `sdk.dir` 推导 `adb`，找不到时给出可读提示。
+
+`.ps1` 一律保存为 **UTF-8 with BOM**：Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读取，中文注释与提示文本可能导致解析失败。
+
+### 4. 发版流程
+
+```powershell
+cd vitals-android
+powershell -ExecutionPolicy Bypass -File .\build-apk.ps1   # 构建 → output\Vitals-Android-<版本>.apk
+cd ..
+.\release.ps1                                             # 读取 versionName，构建并发布到 GitHub Release
+.\release.ps1 -SkipBuild                                  # 只上传 output\ 中已有的 APK
+```
+
+发布前先跑：`node vitals-android/tools/sync-assets.mjs`、`node vitals-android/tools/updater.test.mjs`、`node vitals-android/tools/test-core.cjs`。
+版本号只改 `app/build.gradle` 的 `versionName` / `versionCode`；Release 资产名必须是 `Vitals-Android-<versionName>.apk`（应用内一键更新按该命名匹配）。
 
 ---
 

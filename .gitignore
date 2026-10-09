@@ -15,7 +15,16 @@ captures/
 # ===== 仓库里的临时目录与原始发布包 =====
 .backup-*/
 .staging-*/
-.local-ci/
+# .local-ci 下的验证产物与临时库（脚本、夹具、seed/DDL 本身入库，见该目录 README）
+.local-ci/sqlite-check/*.db
+.local-ci/sqlite-check/*.db-journal
+.local-ci/sqlite-check/*.db-wal
+.local-ci/sqlite-check/*.db-shm
+.local-ci/sqlite-check/*.sql.tmp
+.local-ci/updater-check/out/
+.local-ci/backup-format-check/out/
+.local-ci/*.tmp
+.local-ci/debug-*.mjs
 *.zip
 *.7z
 *.rar

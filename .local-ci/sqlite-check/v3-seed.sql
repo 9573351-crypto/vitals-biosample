@@ -1,0 +1,10 @@
+CREATE TABLE samples (sample_id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, barcode TEXT UNIQUE, status TEXT NOT NULL CHECK(status IN ('in','out')), slot INTEGER, last_slot INTEGER, pending_intake INTEGER NOT NULL DEFAULT 0, type TEXT, location TEXT, collected_at TEXT, collected_time_text TEXT, temperature REAL, note TEXT, photo TEXT, created_at INTEGER, updated_at INTEGER, monitor INTEGER NOT NULL DEFAULT 0, last_temperature REAL, last_humidity REAL, last_light REAL, last_update TEXT, alert TEXT, qr_snapshot TEXT, extra_json TEXT NOT NULL DEFAULT '{}');
+CREATE TABLE records (id INTEGER PRIMARY KEY AUTOINCREMENT, sample_id TEXT, sample_name TEXT NOT NULL DEFAULT '', time TEXT NOT NULL DEFAULT '', type TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', barcode TEXT, slot INTEGER, status TEXT, task_id TEXT, extra_json TEXT NOT NULL DEFAULT '{}');
+CREATE INDEX records_sample_time ON records(sample_id,time);
+CREATE TABLE settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+CREATE TABLE db_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+CREATE TABLE records_archive (id INTEGER PRIMARY KEY, sample_id TEXT, sample_name TEXT NOT NULL DEFAULT '', time TEXT NOT NULL DEFAULT '', type TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', barcode TEXT, slot INTEGER, status TEXT, task_id TEXT, extra_json TEXT NOT NULL DEFAULT '{}');
+INSERT INTO samples (sample_id,name,barcode,status,slot,type,location,photo,created_at,updated_at,extra_json) VALUES ('S1','legacy-sample','C1','in',1,'serum','disc-0','data:image/jpeg;base64,YWJj',1,1,'{"env":[{"time":"2026-10-01 08:00","temp":4.2}]}');
+INSERT INTO records (sample_id,sample_name,time,type,detail) VALUES ('S1','legacy-sample','2026-10-01 08:00','in','legacy record');
+INSERT INTO db_meta (key,value) VALUES ('legacy_s_extra','{"samplesSeeded":true}');
+INSERT INTO db_meta (key,value) VALUES ('revision','7');

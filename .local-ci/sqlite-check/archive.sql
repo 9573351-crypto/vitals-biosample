@@ -1,0 +1,1 @@
+INSERT INTO records_archive (id,sample_id,sample_name,time,type,detail) SELECT id,sample_id,sample_name,time,type,detail FROM records; DELETE FROM records;

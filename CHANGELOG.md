@@ -2,6 +2,31 @@
 
 本项目的应用版本与 GitHub Release 标签（`vX.Y.Z`）保持一致；Android 端内置的一键更新会读取最新 Release 作为升级来源。
 
+## v1.20.0
+
+### 数据存储
+
+- **照片外置**：samples 新增 `photo_path` / `photo_hash` / `thumb` 三列，照片以内容寻址写入 `files/photos/<hash 前 2 位>/<hash>.jpg`，行内不再保存整张 base64。列表与详情先用缩略图（长边 ≤160）渲染，全图在打开详情时经 `getSamplePhoto(id,true)` 按需读取。旧库升级时自动把既有 base64 落盘并回填（幂等，记 `db_meta.photo_migrated`）。
+- **照片三态语义**：编辑保存时不携带 `photo` 键＝保留现有照片；`photo:null`/空串＝移除；`photo:<dataURL>`＝落盘覆盖。
+- **历史曲线容量策略**：每样本 `env` 上限 2000 点，超出后较早的点按分钟聚合（仍超限则逐级加粗），最近 200 点始终保留原始；写入与导入两条路径都生效。
+- **记录结构化与留存**：records 新增 `operator` / `source`（CHECK 枚举 manual/hardware/scanner/system）/ `type_code` 三列，`time` 统一为 ISO 8601，新增 `records_time` 与 `records_type_code` 索引；超过 5000 条时最旧记录自动搬入 `records_archive`。
+- **并发与一致性**：启用 WAL 与 `busy_timeout=5000`；新增 `snapshot()` 在单个事务内一次读齐 revision/samples/records/settings，前端不再靠轮询比对 revision。
+- **备份覆盖全部真源**：`db_meta` 的 `legacy_s_extra` / `legacy_migrated_at` 随备份往返（`legacyMeta` 字段，不参与 checksum）。
+
+### 导入导出
+
+- **备份自描述与完整性校验**：备份头新增 `schemaVersion` / `appVersion` / `counts` / `checksum`（规范化 JSON 的 SHA-256，算法与浏览器预览桥逐字节一致）；导入先校验 app、schema 版本、条目数与校验和，任一不符即拒绝且库不变。
+- **可选照片**：`exportBackup(includePhotos)` 默认不含照片（体积小），设置页可勾选包含。
+- **导入不再破坏性整体替换**：`importBackupEx(payload, mode, filterJson)` 支持 `preview`（只算差异）/ `replace`（仅空库）/ `merge`（按 id 去重、条码冲突拒绝、记录按内容指纹去重），并支持按样本 ID／条码子集恢复；界面为「预览差异 → 确认导入」两段式。旧 `importBackup`/`replaceBackup` 保留原语义。
+- **CSV 导出**：records / samples / env 三张表，带 BOM（Excel 可直接打开），落盘 MIME 按扩展名推断（.csv → text/csv）。
+- **记录与照片界面**：记录页分页（默认 200，加载更多）、时间范围与类型筛选、来源/操作人列；标签信息过期（冻结的 `qrSnap` 与实际位置/状态不一致）时提示重打。
+
+### 工程
+
+- 新增 `vitals-android/tools/sync-assets.mjs`：两份前端副本（assets 与 web-preview）一致性校验与 `--fix` 同步，白名单外哈希不一致即失败。
+- 测试脚本不再写死本机路径：`adb` 从 `ANDROID_HOME`/`ANDROID_SDK_ROOT`/`local.properties` 推导，Playwright 缺失时跳过而非中断；新增 `.local-ci` 系列验证（备份夹具、真实 sqlite3 迁移复现、跨端校验和比对）。
+- 补充 `vitals-android/docs/DATA-DICTIONARY.md` 数据字典与 README 开发约定（含「所有 .ps1 必须带 UTF-8 BOM」这一 Windows PowerShell 5.1 兼容要求）。
+
 ## v1.19.2
 
 ### 修复：自动更新检测不到新版本

@@ -1,0 +1,79 @@
+{
+  "app": "vitals-biosample",
+  "schemaVersion": 4,
+  "appVersion": "1.19.3",
+  "exportedAt": "2026-10-09T08:00:00+08:00",
+  "counts": {
+    "samples": 1,
+    "records": 2
+  },
+  "checksum": "sha256:56e57084e568a64965c976d7f7352e56edbf1379eecb003033dbba2990eb46ae",
+  "samples": {
+    "SB-10001": {
+      "id": "SB-10001",
+      "name": "血清样本-01",
+      "code": "SB-90001",
+      "type": "血清",
+      "status": "in",
+      "slot": 1,
+      "loc": "圆盘-0",
+      "timeTxt": "2026-10-09 08:00",
+      "timeRaw": "2026-10-09T08:00",
+      "temp": 4.2,
+      "monitor": false,
+      "alert": "good",
+      "createdAt": 1759968000000,
+      "updatedAt": 1759968000000,
+      "pendingIntake": false,
+      "env": [
+        {
+          "time": "2026-10-09T08:00",
+          "temp": 4.2
+        },
+        {
+          "time": "2026-10-09T08:01",
+          "temp": 4.3
+        }
+      ],
+      "photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA=="
+    }
+  },
+  "records": [
+    {
+      "recordId": 1,
+      "sampleId": "SB-10001",
+      "sample": "血清样本-01",
+      "time": "2026-10-09T08:00",
+      "type": "入库",
+      "detail": "夹具记录 1",
+      "code": "SB-90001",
+      "slot": 1,
+      "status": "in",
+      "taskId": "T-FIXTURE-1",
+      "source": "manual",
+      "type_code": "in",
+      "operator": "夹具"
+    },
+    {
+      "recordId": 2,
+      "sampleId": "SB-10001",
+      "sample": "血清样本-01",
+      "time": "2026-10-09T08:00",
+      "type": "入库",
+      "detail": "夹具记录 2",
+      "code": "SB-90002",
+      "slot": 1,
+      "status": "in",
+      "taskId": "T-FIXTURE-2",
+      "source": "manual",
+      "type_code": "in",
+      "operator": "夹具"
+    }
+  ],
+  "settings": {
+    "hi": 8,
+    "lo": -88,
+    "simOn": false,
+    "online": 0
+  }
+}

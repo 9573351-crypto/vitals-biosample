@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vitals · 生息 — 生物样本动态管理库</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
-<link rel="stylesheet" href="styles.css?v=23"><link rel="stylesheet" href="android.css">
+<link rel="stylesheet" href="styles.css?v=24"><link rel="stylesheet" href="android.css">
 <script src="vendor/qrcode.min.js" defer></script>
 <script src="vendor/chart.umd.js" defer></script>
-<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=25" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="backup.js" defer></script><script src="updater.js" defer></script>
+<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=26" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="backup.js" defer></script><script src="updater.js" defer></script>
 </head>
 <body>
 
@@ -207,11 +207,18 @@
     <section class="view" id="view-records">
       <div class="panel glass">
         <div class="panel-head"><h3>操作与采集记录</h3><span id="recordCount" class="pill">0 条</span></div>
+        <div class="record-filters">
+          <label class="field"><span>起始日期</span><input id="recordFrom" class="input" type="date"></label>
+          <label class="field"><span>结束日期</span><input id="recordTo" class="input" type="date"></label>
+          <label class="field"><span>记录类型</span><select id="recordType" class="select"><option value="">全部类型</option></select></label>
+          <button class="btn ghost" id="recordRefresh">刷新</button>
+        </div>
         <div class="record-table-wrap"><table class="record-table" id="recordTable">
-          <thead><tr><th>时间</th><th>样本</th><th>类型</th><th>详情</th></tr></thead>
+          <thead><tr><th>时间</th><th>样本</th><th>类型</th><th>详情</th><th class="col-source hidden">来源</th><th class="col-operator hidden">操作人</th></tr></thead>
           <tbody id="recordBody"></tbody>
         </table>
-        <div class="empty" id="recordEmpty">暂无记录</div></div>
+        <div class="empty" id="recordEmpty">暂无记录</div>
+        <div class="record-more"><button class="btn ghost hidden" id="recordMore">加载更多</button><span class="muted" id="recordMoreHint"></span></div></div>
       </div>
     </section>
 
@@ -297,8 +304,32 @@
       <div class="qr-hint">二维码仅包含样本编号；样本详情和当前库存以本机记录为准</div>
     </div>
     <div class="modal-foot">
+      <span class="print-warn hidden" id="printWarn">标签信息已过期，建议重新打印</span>
       <button class="btn ghost" id="detailEdit">编辑</button>
       <button class="btn primary" id="printBtn">打印标签</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 导入预览弹窗（先预览差异，确认后再合并/替换） ===== -->
+<div class="modal-mask" id="importModal">
+  <div class="modal glass-panel import-modal">
+    <div class="modal-head">
+      <h3>导入备份</h3>
+      <button class="icon-btn close" id="importClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="importBody"></div>
+      <div class="import-filter">
+        <label class="field"><span>按条码子集恢复（留空表示整份备份）</span>
+          <textarea class="input" id="importFilter" rows="2" placeholder="每行一个条码，或逗号分隔，例如 SB-90001"></textarea>
+        </label>
+        <button class="btn ghost" id="importFilterBtn">按条码重新预览</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="importCancel">取消</button>
+      <button class="btn primary" id="importConfirm">确认导入</button>
     </div>
   </div>
 </div>

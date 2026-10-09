@@ -16,6 +16,8 @@ function processScannerCode(raw,mode,context){
   if(mode==='new')openModal();
   else if(mode!=='fill'||!$('#sampleModal').classList.contains('open')||editingId!==context)return {ok:false,message:'录入表单已变化，请关闭扫码窗口后重试'};
   $('#fCode').value=code;updateBarcodePreview(code);
+  // 标记这次编号来自扫码枪，紧接着的保存会把记录 source 写成 'scanner'
+  window.__vitalsScanSource={at:Date.now(),code};
   return {ok:true,message:'编号已填入，请补全样本信息后保存'};
 }
 

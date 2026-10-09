@@ -402,6 +402,47 @@ img{display:block}
   .label-print svg{width:100%;height:16mm;margin:1mm 0}
 }
 
+/* ===== 记录筛选与分页 ===== */
+.record-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-bottom:14px}
+.record-filters .field{min-width:132px;flex:0 0 auto}
+.record-filters .field span{font-size:11px;font-weight:600;color:var(--text-3)}
+.record-filters .input,.record-filters .select{padding:8px 10px;font-size:13px}
+.record-filters .btn{margin-left:auto}
+.record-more{display:flex;align-items:center;gap:10px;margin-top:12px}
+.record-more .muted{font-size:12px;color:var(--text-3)}
+.record-table th.col-source,.record-table th.col-operator{white-space:nowrap}
+
+/* ===== 照片按需加载占位 ===== */
+.photo-loading{font-size:12px;color:var(--text-3);padding:6px 8px;text-align:center;line-height:1.5}
+.detail-photo .photo-loading{width:100%}
+
+/* ===== 标签过期提示（打印按钮旁） ===== */
+.print-warn{font-size:11px;font-weight:600;color:#b25e00;background:rgba(255,159,10,0.16);border-radius:20px;padding:4px 10px;margin-right:auto;align-self:center;max-width:210px;line-height:1.4}
+
+/* ===== 设置：数据导出卡 ===== */
+.export-toggle input{width:18px;height:18px;flex:none}
+.set-actions{flex-wrap:wrap}
+.export-range{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.export-range .field{flex:1;min-width:132px}
+
+/* ===== 导入预览 ===== */
+.import-modal{width:600px}
+.import-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.import-grid>div{background:rgba(0,0,0,0.03);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.import-grid span{font-size:11px;color:var(--text-3);font-weight:600}
+.import-grid b{font-size:15px;font-weight:600}
+.import-conflict,.import-warn,.import-error{margin-top:10px;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.6}
+.import-conflict{background:rgba(255,159,10,0.12);color:#8a4a00}
+.import-warn{background:rgba(10,105,255,0.08);color:var(--text-2)}
+.import-error{background:rgba(255,95,87,0.12);color:#a11207;word-break:break-word}
+.import-conflict b,.import-warn b,.import-error b{display:block;margin-bottom:4px}
+.import-conflict p,.import-error p{margin:0}
+.import-warn ul{margin:0;padding-left:18px}
+.import-filter{margin-top:14px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.import-filter textarea{resize:vertical;font-family:inherit;min-height:52px;width:100%}
+.import-filter .field{width:100%}
+.import-filter .field span{font-size:12px;font-weight:600;color:var(--text-2)}
+
 /* ===== 响应式 ===== */
 @media(max-width:1080px){
   .cards{grid-template-columns:repeat(2,1fr)}
@@ -417,6 +458,10 @@ img{display:block}
 @media(max-width:720px){
   .grid-2{grid-template-columns:1fr}
   .form-row{grid-template-columns:1fr}
+  .import-grid{grid-template-columns:1fr 1fr}
+  .record-filters{align-items:stretch}
+  .record-filters .field{flex:1 1 140px}
+  .record-filters .btn{margin-left:0;flex:1 1 100%}
   .monitor-head{flex-direction:column;align-items:flex-start}
   .content{padding:16px}
   .page-title{font-size:20px}

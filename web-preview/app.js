@@ -4,7 +4,7 @@
 
 /* ==================== 构建指纹 ==================== */
 // 构建指纹：每次更新递增，用于核对界面实际加载的代码是否为新版（若非新版则说明入口缓存）
-const BUILD = 'v24-0909';
+const BUILD = 'v25-1009';
 
 /* ==================== 工具 ==================== */
 const $ = s => document.querySelector(s);
@@ -71,19 +71,43 @@ function seedIfNew(){
     }
   });
   // 注入示例记录
-  state.rec.push({ time: FMT.now(), sample:'系统', type:'初始化', detail:'已载入 3 个示例样本用于演示（可在设置中清空）' });
+  state.rec.push({ time: FMT.now(), sample:'系统', type:'初始化', detail:'已载入 3 个示例样本用于演示（可在设置中清空）', ...recordMeta('初始化','system') });
   saveAll();
 }
 
 /* ==================== 记录 ====================
-输入addRecord('血清样本-01', '入库', '存放至 A-01-03');
-创建一条记录;插入state.rec 最前面;最多保留500条;调用saveAll()保存*/
-function addRecord(sampleName, type, detail, sampleId=null, persist=true){
+   输入addRecord('血清样本-01', '入库', '存放至 A-01-03');
+   创建一条记录;插入state.rec 最前面;调用saveAll()保存
+   同时写入原生 records 的 source / type_code 三列（source 受 CHECK 约束，type_code 供分页筛选）。 */
+/* 与原生 records.source CHECK IN ('manual','hardware','scanner','system') 完全一致 */
+const RECORD_SOURCES = Object.freeze({manual:'manual', hardware:'hardware', scanner:'scanner', system:'system'});
+/* 中文动作 → 英文 type_code（下拉筛选用同一套枚举） */
+const RECORD_TYPE_CODES = Object.freeze({
+  '录入':'create','编辑':'edit','删除':'delete','入库':'in','出库':'out','槽位绑定':'bind',
+  '任务取消':'cancel','任务状态':'task','初始化':'system','系统':'system',
+  '告警':'alert','恢复':'recover','连接':'connect','断开':'disconnect'
+});
+const RECORD_TYPE_LABELS = Object.freeze(Object.fromEntries(Object.entries(RECORD_TYPE_CODES).map(([cn,code])=>[code,cn])));
+/* 单机场景不采集操作人：operator 统一写 NULL（列在记录页按“有值才显示”的规则隐藏） */
+function recordMeta(type, source){
+  return {source: RECORD_SOURCES[source]||'manual', typeCode: RECORD_TYPE_CODES[type]||null, operator: null};
+}
+/* 本地记录镜像上限与原生 DB 留存（5000 行）保持一致，避免本地截断触发误删库内记录 */
+const RECORD_LOCAL_MAX = 5000;
+/* 扫码枪把编号填进表单后，紧接着的一次保存记为 scanner 来源（30 秒内有效） */
+function takeScanSource(){
+  const mark = window.__vitalsScanSource;
+  window.__vitalsScanSource = null;
+  if(!mark || Date.now()-mark.at > 30000) return 'manual';
+  return 'scanner';
+}
+
+function addRecord(sampleName, type, detail, sampleId=null, persist=true, source='manual'){
   const sample=sampleId ? state.s.samples[sampleId] : null;
-  const record={time:FMT.now(),sample:sampleName,type,detail,sampleId};
+  const record={time:FMT.now(),sample:sampleName,type,detail,sampleId,...recordMeta(type,source)};
   if(sample){record.code=sample.code||null;record.slot=sample.slot||null;record.status=sample.status;}
   state.rec.unshift(record);
-  if(state.rec.length>500)state.rec.length=500;
+  if(state.rec.length>RECORD_LOCAL_MAX)state.rec.length=RECORD_LOCAL_MAX;
   return !persist || saveAll();
 }
 
@@ -191,6 +215,39 @@ function renderFeed(){
     </div>`).join('');
 }
 
+/* ==================== 照片：缩略图优先，详情按需取全图 ====================
+   新原生把全图外置到文件系统，启动快照里只有 thumb（小图 data URL）与 photoPath。
+   列表/详情一律先用 thumb；进入详情弹窗时再调 getSamplePhoto(id,true) 取全图替换。
+   老版本原生 / 预览桥没有 getSamplePhoto 时，退回样本对象里的 photo 字段。 */
+function sampleThumbSrc(x){
+  if(!x) return '';
+  return x.thumb || x.photo || '';
+}
+function setPhotoImg(node, src, alt){
+  if(!node) return;
+  if(src){ node.innerHTML = `<img style="width:100%;height:100%;object-fit:cover;border-radius:inherit" src="${src}" alt="${esc(alt||'样本照片')}">`; }
+}
+/* 详情弹窗照片：先渲染缩略图/骨架，再同步补全图（Android 桥是同步的） */
+function renderDetailPhoto(x){
+  const ph = $('#detailPhoto');
+  if(!ph || !x) return;
+  const thumb = sampleThumbSrc(x);
+  if(thumb){
+    setPhotoImg(ph, thumb, '样本照片');
+  } else if(Store.canGetPhoto() && (x.photoPath || x.photoHash)){
+    ph.innerHTML = '<div class="photo-loading">加载照片…</div>';
+  } else {
+    ph.innerHTML = '无照片';
+    return;
+  }
+  if(!Store.canGetPhoto()) return;
+  const info = Store.samplePhoto(x.id, true);
+  if(!info || detailId !== x.id) return;
+  if(info.thumb && !thumb) setPhotoImg(ph, info.thumb, '样本照片');
+  if(info.missing || !info.photo){ if(!thumb && !info.thumb) ph.innerHTML = '<div class="photo-loading">照片文件缺失</div>'; return; }
+  setPhotoImg(ph, info.photo, '样本照片');
+}
+
 /* ==================== 样本库 ==================== */
 let editingId = null;
 
@@ -216,7 +273,8 @@ function renderLibrary(){
     const st = x.status==='out' ? 'out' : 'in';
     const stLbl = x.pendingIntake ? '待入库' : (x.status==='out' ? '已出库' : '已入库');
     const tempTxt = x.lastTemp != null ? x.lastTemp.toFixed(1)+'℃' : (x.temp!=null?x.temp+'℃':'—');
-    const thumb = x.photo ? `<img class="sample-thumb" src="${x.photo}" alt="">` : `<div class="sample-thumb no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7 12 4l8 3-8 3-8-3z"/><path d="M4 7v10l8 3 8-3V7"/><path d="M4 7l8 3 8-3"/></svg></div>`;
+    const thumbSrc = sampleThumbSrc(x);
+    const thumb = thumbSrc ? `<img class="sample-thumb" src="${thumbSrc}" alt="">` : `<div class="sample-thumb no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7 12 4l8 3-8 3-8-3z"/><path d="M4 7v10l8 3 8-3V7"/><path d="M4 7l8 3 8-3"/></svg></div>`;
     const btnIn = st==='in' ? '<button class="mini-btn btn-on" data-act="in" disabled>已入库</button>'
                             : '<button class="mini-btn in" data-act="in">入库</button>';
     const btnOut = st==='out' ? '<button class="mini-btn btn-on" data-act="out" disabled>'+ (x.pendingIntake?'待入库':'已出库') +'</button>'
@@ -343,6 +401,9 @@ function setDefaultTime(){
 
 /* ==================== 录入弹窗 ==================== */
 let modalPhoto = null;
+// 用户是否在本次弹窗里改过照片。未改过时保存绝不发送 photo 字段，
+// 否则会把原生已经外置的 photo_path/photo_hash 覆盖成空。
+let modalPhotoChanged = false;
 
 function sampleSlotTaken(type,slot,exceptId=null){
   return Object.values(state.s.samples).some(x=>x.id!==exceptId&&x.type===type&&(
@@ -381,8 +442,14 @@ function openModal(id){
       $('#fTime').value = x.timeRaw || (x.time?dateToLocal(x.time): '');
       $('#fTemp').value = x.temp != null ? x.temp : '';
       $('#fNote').value = x.note || '';
-      modalPhoto = x.photo || null;
+      modalPhotoChanged = false;
+      // 已有外置照片时先用 thumb 预览（老库可能还留着 photo 全图）
+      modalPhoto = sampleThumbSrc(x) || null;
       setPhotoPreview();
+      if(!modalPhoto && Store.canGetPhoto() && (x.photoPath || x.photoHash)){
+        const info = Store.samplePhoto(id, false);
+        if(info && !info.missing && info.thumb && editingId === id){ modalPhoto = info.thumb; setPhotoPreview(); }
+      }
       updateBarcodePreview(x.code);
     }
   } else {
@@ -390,7 +457,7 @@ function openModal(id){
     $('#fTemp').value = '';
     $('#fName').value=''; $('#fNote').value=''; $('#fType').value='全血';
     refreshSampleSlotOptions();
-    modalPhoto = null; setPhotoPreview();
+    modalPhoto = null; modalPhotoChanged = false; setPhotoPreview();
     updateBarcodePreview('');
   }
   setTimeout(()=> $('#fName').focus(), 120);
@@ -456,9 +523,10 @@ photoInput.addEventListener('change', ()=>{
   if(f) readPhoto(f);
 });
 function readPhoto(file){
-  // 压缩为缩略图后存储，避免原始 base64 撑爆 localStorage（QuotaExceeded）
+  // 压缩为 JPEG data URL 后再交给原生：新原生会把它落盘成 photos/<hash>.jpg 并生成 thumb。
   compressPhoto(file, dataUrl => {
     modalPhoto = dataUrl;
+    modalPhotoChanged = true;
     setPhotoPreview();
   });
 }
@@ -484,7 +552,7 @@ function setPhotoPreview(){
   if(modalPhoto){ img.src = modalPhoto; img.hidden=false; ph.style.display='none'; rm.hidden=false; }
   else { img.hidden=true; img.src=''; ph.style.display='flex'; rm.hidden=true; }
 }
-$('#removePhoto').addEventListener('click', e=>{ e.stopPropagation(); modalPhoto=null; setPhotoPreview(); });
+$('#removePhoto').addEventListener('click', e=>{ e.stopPropagation(); modalPhoto=null; modalPhotoChanged=true; setPhotoPreview(); });
 
 /* 保存 */
 $('#modalSave').addEventListener('click', ()=>{
@@ -510,14 +578,19 @@ $('#modalSave').addEventListener('click', ()=>{
   if(dup){ $('#fCode').focus(); toast('样本编号已存在：' + code); return; }
 
   const now = Date.now();
+  let savedId = editingId;
+  // 来源：扫码枪填入的编号 → scanner；其余界面操作 → manual
+  const saveSource = takeScanSource();
   if(editingId){
     const x = state.s.samples[editingId];
     if(x.status==='in'&&x.type!==type){toast('在库样本不能更换圆盘类型，请先完成出库');return;}
-    Object.assign(x, { name, code, type, loc, timeRaw, timeTxt, temp, note, photo: modalPhoto, updatedAt: now });
+    Object.assign(x, { name, code, type, loc, timeRaw, timeTxt, temp, note, updatedAt: now });
+    applyModalPhoto(x);
     if(x.status==='out')x.plannedSlot=plannedSlot;else delete x.plannedSlot;
-    addRecord(name, '编辑', `更新样本「${name}」信息`, editingId, false);
+    addRecord(name, '编辑', `更新样本「${name}」信息`, editingId, false, saveSource);
   } else {
     const id = uid();
+    savedId = id;
     const sample = {
       id, name, code, type, loc, timeRaw, timeTxt, temp, note,
       photo: modalPhoto, createdAt: now, updatedAt: now,
@@ -525,9 +598,10 @@ $('#modalSave').addEventListener('click', ()=>{
     };
     sample.qrSnap = sampleInfoCard(sample); // 创建时冻结二维码快照，此后编辑/温度变化不再改动
     state.s.samples[id] = sample;
-    addRecord(name, '录入', `新增样本「${name}」（${code}）`, id, false);
+    addRecord(name, '录入', `新增样本「${name}」（${code}）`, id, false, saveSource);
   }
-  if(!saveThrowState()){ toast('保存失败：存储不足，请减少照片或先清空部分数据'); return; }
+  if(!saveThrowState()){ toast('保存失败，数据库保持原状态，请先导出备份'); return; }
+  if(modalPhotoChanged && modalPhoto) refreshSavedThumb(savedId);
   recomputeStats();
   $('#sampleModal').classList.remove('open');
   toast('样本已保存');
@@ -539,6 +613,24 @@ function shakeField(el){
   $(el).style.borderColor = 'var(--red)';
   setTimeout(()=> $(el).style.borderColor = 'var(--border)', 1200);
 }
+/* 只有用户真的换过照片才写 photo；未换图时不发送该字段，原生会保留已外置的照片文件。 */
+function applyModalPhoto(x){
+  if(!modalPhotoChanged) return false;
+  x.photo = modalPhoto || null;
+  delete x.thumb; delete x.photoPath; delete x.photoHash;
+  return true;
+}
+/* 原生落盘并生成 thumb 后，用 thumb 替换本地的全图 base64，避免后续提交反复上传照片。 */
+function refreshSavedThumb(id){
+  const x = state.s.samples[id];
+  if(!x || !Store.canGetPhoto()) return;
+  const info = Store.samplePhoto(id, false);
+  if(!info || info.missing || !info.thumb) return;
+  x.thumb = info.thumb;
+  if(info.hash) x.photoHash = info.hash;
+  delete x.photo;
+  if(typeof Store.capture === 'function') Store.capture(state);
+}
 function saveThrowState(){ return saveAll(); }
 function refreshStats(){
   if(window.refreshMotionPanel)window.refreshMotionPanel();
@@ -548,6 +640,42 @@ function refreshStats(){
   $('#statAlert').textContent = state.s.alert;
   if($('#view-dashboard').classList.contains('active')) renderLibChart();
 }
+
+/* ==================== 标签信息过期提示 ====================
+   qrSnap 是创建标签时冻结的样本信息卡（位置/状态）。打印成功后重新冻结并记 labelPrintedAt，
+   之后只要样本没有被移动/改状态，就不再重复提示「标签信息已过期」。 */
+function qrSnapField(x, label){
+  if(!x || !x.qrSnap) return null;
+  const m = String(x.qrSnap).match(new RegExp('^'+label+'：(.+)$','m'));
+  return m ? m[1].trim() : null;
+}
+function currentStatusText(x){
+  return x && x.pendingIntake ? '待入库' : (x && x.status==='out' ? '已出库' : '已入库');
+}
+function labelFreshness(x){
+  const snapLoc = qrSnapField(x,'位置'), snapStatus = qrSnapField(x,'状态');
+  if(snapLoc==null && snapStatus==null) return {stale:false, detail:''};
+  const changed = [];
+  if(snapLoc!=null && snapLoc !== (x.loc||'未定位')) changed.push('位置');
+  if(snapStatus!=null && snapStatus !== currentStatusText(x)) changed.push('状态');
+  if(!changed.length) return {stale:false, detail:''};
+  const printed = x.labelPrintedAt ? '（上次打印 '+x.labelPrintedAt+'）' : '';
+  return {stale:true, detail:'标签冻结的'+changed.join('、')+'与当前记录不一致，建议重新打印'+printed};
+}
+/* 打印成功后由 printer.js 调用：重新冻结信息卡并记录打印时间。 */
+window.markLabelPrinted = function(id){
+  const x = state.s.samples[id];
+  if(!x) return false;
+  x.qrSnap = sampleInfoCard(x);
+  x.labelPrintedAt = FMT.now();
+  const ok = saveAll();
+  if(ok && detailId === id){
+    const stale = $('#diBadges .label-stale');
+    if(stale) stale.remove();
+    if($('#printWarn')) $('#printWarn').classList.add('hidden');
+  }
+  return ok;
+};
 
 /* ==================== 详情弹窗 ==================== */
 let detailId = null;
@@ -568,11 +696,16 @@ function openDetail(id){
   const lastTxt = x.lastTemp != null ? x.lastTemp.toFixed(2)+' ℃' : '—';
   const lastT = x.lastUpdate ? x.lastUpdate : '';
   $('#diLast').textContent = lastTxt + (lastT ? '  @'+esc(lastT.slice(-8)) : '');
-  const ph = $('#detailPhoto');
-  if(x.photo){ ph.innerHTML = `<img style="width:100%;height:100%;object-fit:cover;border-radius:inherit" src="${x.photo}" alt="样本照片">`; }
-  else { ph.innerHTML = '无照片'; }
+  renderDetailPhoto(x);
+  const fresh = labelFreshness(x);
   $('#diBadges').innerHTML = `<span class="badge ${cls}">${lbl}</span>` +
-    (x.monitor?`<span class="badge info">实时</span>`:'');
+    (x.monitor?`<span class="badge info">实时</span>`:'') +
+    (fresh.stale?`<span class="badge warn label-stale" title="${esc(fresh.detail)}">标签信息已过期，建议重新打印</span>`:'');
+  const printWarn = $('#printWarn');
+  if(printWarn){
+    printWarn.classList.toggle('hidden', !fresh.stale);
+    printWarn.title = fresh.detail;
+  }
   renderQR($('#diQR'), sampleQRText(x));
   $('#detailModal').classList.add('open');
 }
@@ -617,16 +750,127 @@ function statsToEls(){
   $('#statAlert').textContent = state.s.alert;
 }
 
-/* ==================== 记录页 ==================== */
-function renderRecords(){
+/* ==================== 记录页 ====================
+   原生有 recordsPage() 时走数据库分页（默认 200 条 + 加载更多），
+   没有该桥方法（老原生 / 网页预览桥）时对启动快照里的记录做同样的筛选与切片。 */
+const RECORD_PAGE_SIZE = 200;
+let recordView = {rows:[], total:0, hasMore:false, offset:0, degraded:false};
+
+const RECORD_SOURCE_LABELS = {manual:'人工', hardware:'硬件', scanner:'扫码枪', system:'系统'};
+function recordSourceLabel(source){
+  if(source==null || source==='') return '—';
+  return RECORD_SOURCE_LABELS[source] || String(source);
+}
+function recordTypeCode(r){ return (r && (r.typeCode || r.type_code)) || ''; }
+
+function recordFilterIso(){
+  const fromEl = $('#recordFrom'), toEl = $('#recordTo');
+  const from = fromEl ? fromEl.value : '', to = toEl ? toEl.value : '';
+  return {from: from ? from+'T00:00' : '', to: to ? to+'T23:59' : ''};
+}
+function recordTypeFilterValue(){
+  const el = $('#recordType');
+  return el ? el.value : '';
+}
+function recordMatchesFilter(r, filter, typeValue){
+  const time = String(r.time||'').replace(' ','T').slice(0,16);
+  if(filter.from && time && time < filter.from) return false;
+  if(filter.to && time && time > filter.to) return false;
+  if(typeValue){
+    if(typeValue.indexOf('code:')===0){ if(recordTypeCode(r)!==typeValue.slice(5)) return false; }
+    else if(typeValue.indexOf('text:')===0){ if(String(r.type||'')!==typeValue.slice(5)) return false; }
+  }
+  return true;
+}
+/* 类型下拉：使用与 records.type_code 相同的英文枚举（中文只作展示），
+   同时兼容老库/旧桥里只有中文 type、没有 type_code 的记录。 */
+function refreshRecordTypeOptions(){
+  const sel = $('#recordType');
+  if(!sel) return;
+  const extras = new Set(), types = new Set();
+  for(const r of state.rec.concat(recordView.rows)){
+    const code = recordTypeCode(r);
+    if(code){ if(!RECORD_TYPE_LABELS[code]) extras.add(code); }
+    else if(r.type) types.add(String(r.type));
+  }
+  const options = ['<option value="">全部类型</option>'];
+  const seen = new Set();
+  Object.values(RECORD_TYPE_CODES).concat(Array.from(extras)).forEach(code=>{
+    if(seen.has(code)) return;
+    seen.add(code);
+    options.push(`<option value="code:${esc(code)}">${esc(RECORD_TYPE_LABELS[code]||code)}</option>`);
+  });
+  Array.from(types).sort().forEach(type=>options.push(`<option value="text:${esc(type)}">${esc(type)}</option>`));
+  const current = sel.value;
+  sel.innerHTML = options.join('');
+  if(Array.from(sel.options).some(option=>option.value===current)) sel.value = current;
+}
+function recordColumnVisible(name, visible){
+  const table = $('#recordTable');
+  if(!table) return;
+  table.querySelectorAll('th.col-'+name).forEach(th=>th.classList.toggle('hidden', !visible));
+}
+function paintRecords(){
   const body = $('#recordBody');
+  if(!body) return;
+  const rows = recordView.rows, total = Math.max(recordView.total, rows.length);
   const count = $('#recordCount');
+  if(count) count.textContent = total + ' 条' + (rows.length < total ? '（已载入 '+rows.length+'）' : '');
   const empty = $('#recordEmpty');
-  count.textContent = state.rec.length + ' 条';
-  if(!state.rec.length){ body.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display='none';
-  body.innerHTML = state.rec.slice(0,200).map(r => `
-    <tr><td>${esc(r.time)}</td><td>${esc(r.sample)}</td><td>${esc(r.type)}</td><td>${esc(r.detail)}</td></tr>`).join('');
+  if(empty) empty.style.display = rows.length ? 'none' : 'block';
+  const hasSource = rows.some(r=>recordSourceLabel(r.source)!=='—');
+  const hasOperator = rows.some(r=>r.operator);
+  recordColumnVisible('source', hasSource);
+  recordColumnVisible('operator', hasOperator);
+  body.innerHTML = rows.map(r => {
+    const sourceCell = hasSource ? `<td class="col-source">${esc(recordSourceLabel(r.source))}</td>` : '';
+    const operatorCell = hasOperator ? `<td class="col-operator">${esc(r.operator||'—')}</td>` : '';
+    return `<tr><td>${esc(r.time)}</td><td>${esc(r.sample)}</td><td>${esc(r.type)}</td><td>${esc(r.detail)}</td>${sourceCell}${operatorCell}</tr>`;
+  }).join('');
+  const more = $('#recordMore');
+  if(more) more.classList.toggle('hidden', !recordView.hasMore);
+  const hint = $('#recordMoreHint');
+  if(hint){
+    if(recordView.degraded) hint.textContent = '当前版本不支持数据库分页，仅显示已载入的记录';
+    else if(recordView.hasMore) hint.textContent = '还有更多记录';
+    else if(total) hint.textContent = '已显示全部记录';
+    else hint.textContent = '';
+  }
+}
+function renderRecords(reset){
+  const body = $('#recordBody');
+  if(!body) return;
+  if(reset !== false){ recordView = {rows:[], total:0, hasMore:false, offset:0, degraded:recordView.degraded}; refreshRecordTypeOptions(); }
+  const filter = recordFilterIso(), typeValue = recordTypeFilterValue();
+  let page = Store.recordsPage(filter.from, filter.to, recordTypeValueForBridge(typeValue), RECORD_PAGE_SIZE, recordView.offset);
+  if(page){
+    recordView.degraded = false;
+  } else {
+    // 降级：无 recordsPage 桥方法，用启动快照里的记录在本地筛选/切片
+    const all = state.rec.filter(r=>recordMatchesFilter(r, filter, typeValue));
+    page = {records: all.slice(recordView.offset, recordView.offset+RECORD_PAGE_SIZE),
+            total: all.length,
+            hasMore: all.length > recordView.offset + RECORD_PAGE_SIZE};
+    recordView.degraded = true;
+  }
+  recordView.rows = recordView.rows.concat(page.records);
+  recordView.total = page.total;
+  recordView.hasMore = page.hasMore;
+  recordView.offset = recordView.rows.length;
+  paintRecords();
+}
+/* typeCode 走桥；下拉里的 text: 前缀是老库中文类型的本地过滤标记，不能传给原生 */
+function recordTypeValueForBridge(value){
+  return value && value.indexOf('code:')===0 ? value.slice(5) : '';
+}
+/* 记录页筛选控件只绑定一次；缺控件时安静跳过（兼容旧 index.html 缓存）。 */
+function bindRecordFilters(){
+  const on = (sel, evt, fn) => { const el = $(sel); if(el) el.addEventListener(evt, fn); };
+  on('#recordFrom','change', ()=>renderRecords(true));
+  on('#recordTo','change', ()=>renderRecords(true));
+  on('#recordType','change', ()=>renderRecords(true));
+  on('#recordRefresh','click', ()=>renderRecords(true));
+  on('#recordMore','click', ()=>renderRecords(false));
 }
 
 /* ==================== 设置 ==================== */
@@ -650,21 +894,20 @@ $('#importFile').addEventListener('change', importData);
 $('#resetBtn').addEventListener('click', ()=>{
   confirmDialog('清空全部数据', '确定清空全部样本与记录？此操作不可撤销，且清空后不会重新生成示例数据。', ()=>{
     if(state.set.motionTask){toast('请先处理当前任务');return;}
-    try{state=Store.replace(JSON.stringify({samples:{},records:[],settings:{hi:8,lo:-88,simOn:false}}));}
+    // 行级差分清空：新原生的 replace 只允许空库，这里用增删差分，非空库也能清空。
+    try{state=Store.clearAll({hi:8,lo:-88});}
     catch(e){toast('清空失败：'+e.message);return;}
     unloadSim();reloadUI();fillSettings();
     toast('已清空全部数据');
   });
 });
-function exportData(){
-  if(!saveAll())return;
-  let backup;try{backup=Store.backup();}catch(e){toast('导出失败：'+e.message);return;}
-  const content = JSON.stringify(backup, null, 2);
-  const defName = 'vitals_backup_'+Date.now()+'.json';
-  // Electron：走主进程"另存为"落盘到用户选择位置
-  if(window.AndroidHost){ AndroidHost.exportJson(defName,content); return; }
+
+/* ==================== 导出落盘 ==================== */
+/* Android 走 exportJson；Electron 走主进程；网页预览回退浏览器下载。 */
+function saveTextFile(name, content, mime, okMessage){
+  if(window.AndroidHost){ AndroidHost.exportJson(name, content); return; }
   if(window.api && typeof window.api.saveJson === 'function'){
-    window.api.saveJson(defName, content).then(r=>{
+    window.api.saveJson(name, content).then(r=>{
       if(!r){ toast('导出失败：无响应'); return; }
       if(r.cancel){ toast('已取消导出'); return; }
       if(r.ok){ toast('已导出：'+r.path); return; }
@@ -672,15 +915,72 @@ function exportData(){
     });
     return;
   }
-  // 网页预览版回退：浏览器下载
   if(!URL.createObjectURL){ toast('当前环境不支持导出，请使用桌面安装版'); return; }
-  const blob = new Blob([content], {type:'application/json'});
+  const blob = new Blob([content], {type:mime||'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = defName;
+  a.download = name;
   a.click();
   setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
-  toast('数据已导出备份');
+  toast(okMessage||'已导出');
+}
+/* 侧边栏「导出」：完整备份（保留含照片的旧语义） */
+function exportData(){
+  if(!saveAll())return;
+  let content;try{content=Store.exportBackupText(true);}catch(e){toast('导出失败：'+e.message);return;}
+  saveTextFile('vitals_backup_'+Date.now()+'.json', content, 'application/json', '数据已导出备份');
+}
+
+/* ==================== 设置：数据导出卡片 ==================== */
+function installExportCard(){
+  const view = $('#view-settings');
+  if(!view || $('#exportCard')) return;
+  const hasBackup = Store.canExportBackup(), hasCsv = Store.canExportCsv();
+  const card = document.createElement('section');
+  card.className = 'panel glass'; card.id = 'exportCard';
+  card.innerHTML = '<div class="panel-head"><h3>数据导出</h3><span class="pill" id="exportPill">'+
+      (hasBackup ? (hasCsv?'JSON / CSV':'JSON') : (hasCsv?'JSON（兼容）/ CSV':'JSON（兼容）'))+'</span></div>'+
+    '<p class="muted">备份自带 schema 版本与校验和，可在其他设备导入恢复。默认不含照片，体积更小。</p>'+
+    '<label class="setting-row export-toggle"><span>备份包含样本照片</span><input type="checkbox" id="exportPhotos"></label>'+
+    '<div class="set-actions">'+
+      '<button class="btn primary" id="exportBackupBtn">导出完整备份（JSON）</button>'+
+      '<button class="btn ghost" id="exportRecordsCsv">导出记录 CSV</button>'+
+      '<button class="btn ghost" id="exportSamplesCsv">导出样本 CSV</button>'+
+    '</div>'+
+    '<p class="muted">CSV 导出范围可留空（全部）；结束日期含当天。</p>'+
+    '<div class="export-range">'+
+      '<label class="field"><span>起始日期</span><input class="input" type="date" id="csvFrom"></label>'+
+      '<label class="field"><span>结束日期</span><input class="input" type="date" id="csvTo"></label>'+
+    '</div>';
+  view.appendChild(card);
+  $('#exportBackupBtn').onclick = exportBackupWithPhotos;
+  if(hasCsv){
+    $('#exportRecordsCsv').onclick = ()=>exportCsvFile('records');
+    $('#exportSamplesCsv').onclick = ()=>exportCsvFile('samples');
+  } else {
+    const disable = btn => { btn.disabled = true; btn.title = '当前版本原生不支持 CSV 导出'; };
+    disable($('#exportRecordsCsv')); disable($('#exportSamplesCsv'));
+  }
+}
+function exportBackupWithPhotos(){
+  if(!saveAll())return;
+  const includePhotos = !!($('#exportPhotos') && $('#exportPhotos').checked);
+  let content;try{content=Store.exportBackupText(includePhotos);}catch(e){toast('导出失败：'+e.message);return;}
+  saveTextFile('vitals_backup_'+Date.now()+'.json', content, 'application/json',
+    includePhotos?'备份已导出（含照片）':'备份已导出（不含照片）');
+}
+function exportCsvFile(kind){
+  if(!Store.canExportCsv()){ toast('当前版本不支持 CSV 导出'); return; }
+  const options = {};
+  const from = $('#csvFrom') ? $('#csvFrom').value : '', to = $('#csvTo') ? $('#csvTo').value : '';
+  if(from) options.fromIso = from+'T00:00';
+  if(to) options.toIso = to+'T23:59';
+  const typeValue = recordTypeFilterValue();
+  if(typeValue.indexOf('code:')===0) options.typeCode = typeValue.slice(5);
+  let csv;try{csv=Store.exportCsvText(kind,options);}catch(e){toast('导出失败：'+e.message);return;}
+  if(!csv){ toast('导出失败：内容为空'); return; }
+  const label = kind==='samples' ? '样本' : (kind==='env' ? '温度曲线' : '记录');
+  saveTextFile('vitals_'+kind+'_'+Date.now()+'.csv', csv, 'text/csv', label+' CSV 已导出');
 }
 function confirmDialog(title, msg, onOk){
   const m = $('#confirmModal');
@@ -692,6 +992,121 @@ function confirmDialog(title, msg, onOk){
   yes.onclick = ()=> done(true);
   no.onclick = ()=> done(false);
   m.classList.add('open');
+}
+/* ==================== 导入：先预览差异，用户确认后再合并/替换 ====================
+   新原生 importBackupEx 支持 preview；老原生与网页预览桥没有该桥方法时退回一次性替换。 */
+let importState = {payload:'', mode:'merge', filterJson:''};
+
+function databaseIsEmpty(){
+  if(Object.keys(state.s.samples||{}).length) return false;
+  if(state.rec.length) return false;
+  return !(recordView.total > 0);
+}
+function currentImportMode(){ return databaseIsEmpty() ? 'replace' : 'merge'; }
+function importModeHint(){
+  return databaseIsEmpty()
+    ? '本机数据库为空：确认后按「替换」写入整份备份。'
+    : '本机已有数据：确认后按「合并」导入，不会清空现有样本与记录。';
+}
+function closeImportModal(){ const m = $('#importModal'); if(m) m.classList.remove('open'); }
+function openImportPreview(text){
+  const modal = $('#importModal');
+  if(!modal){ legacyImportFlow(text); return; }
+  importState = {payload:text, mode:currentImportMode(), filterJson:''};
+  const filter = $('#importFilter');
+  if(filter) filter.value = '';
+  const body = $('#importBody');
+  if(body) body.innerHTML = '<p class="muted">正在校验备份…</p>';
+  const confirmBtn = $('#importConfirm');
+  if(confirmBtn){ confirmBtn.disabled = true; confirmBtn.textContent = '确认导入'; }
+  modal.classList.add('open');
+  requestImportPreview('');
+}
+function requestImportPreview(filterJson){
+  const result = Store.importPreview(importState.payload, filterJson);
+  if(result === null){ closeImportModal(); legacyImportFlow(importState.payload); return; }
+  importState.filterJson = filterJson || '';
+  paintImportPreview(result);
+}
+function paintImportPreview(result){
+  const body = $('#importBody');
+  const confirmBtn = $('#importConfirm');
+  if(!body) return;
+  if(!result || result.ok === false || result.dryRun !== true){
+    body.innerHTML = '<div class="import-error"><b>无法导入该备份</b><p>'+
+        esc((result && result.error) || '预览失败')+'</p></div>'+
+      '<p class="muted">预览阶段不会改动本机数据，请检查备份文件后重试。</p>';
+    if(confirmBtn) confirmBtn.disabled = true;
+    return;
+  }
+  const diff = result.diff || {}, counts = result.counts || {};
+  const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+  const conflicts = Array.isArray(diff.conflictCodes) ? diff.conflictCodes : [];
+  const shown = conflicts.slice(0,5), rest = conflicts.length - shown.length;
+  const mode = currentImportMode();
+  importState.mode = mode;
+  const num = v => esc(String(v==null?0:v));
+  const noChange = !diff.newSamples && !diff.updatedSamples && !diff.newRecords && !conflicts.length;
+  body.innerHTML =
+    '<p class="muted">预览未改动本机数据。'+esc(importModeHint())+'</p>'+
+    '<div class="import-grid">'+
+      '<div><span>备份样本</span><b>'+esc(counts.samples==null?'—':String(counts.samples))+'</b></div>'+
+      '<div><span>备份记录</span><b>'+esc(counts.records==null?'—':String(counts.records))+'</b></div>'+
+      '<div><span>新增样本</span><b>'+num(diff.newSamples)+'</b></div>'+
+      '<div><span>更新样本</span><b>'+num(diff.updatedSamples)+'</b></div>'+
+      '<div><span>新增记录</span><b>'+num(diff.newRecords)+'</b></div>'+
+      '<div><span>重复记录</span><b>'+num(diff.duplicateRecords)+'</b></div>'+
+    '</div>'+
+    (conflicts.length ? '<div class="import-conflict"><b>条码冲突 '+conflicts.length+' 条</b><p>'+
+      esc(shown.join('、'))+(rest>0?' 等 '+conflicts.length+' 条':'')+'</p>'+
+      '<p class="muted">冲突样本不会被导入；可在下方按条码做子集恢复。</p></div>' : '')+
+    (warnings.length ? '<div class="import-warn"><b>提示</b><ul>'+
+      warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>' : '')+
+    (noChange ? '<div class="empty">该备份与当前数据没有差异</div>' : '');
+  if(confirmBtn){ confirmBtn.disabled = false; confirmBtn.textContent = mode==='replace' ? '替换导入' : '合并导入'; }
+}
+function importFilterJsonFromInput(){
+  const el = $('#importFilter');
+  const codes = String(el?el.value:'').split(/[\s,，;；]+/).map(x=>x.trim()).filter(Boolean);
+  return codes.length ? JSON.stringify({onlyCodes:codes}) : '';
+}
+function confirmImport(){
+  if(state.set.motionTask){ toast('请先处理当前任务'); return; }
+  const mode = currentImportMode();
+  let result;
+  try{ result = Store.importBackup(importState.payload, mode, importState.filterJson); }
+  catch(e){ paintImportPreview({ok:false, error:(e&&e.message)||'导入失败'}); return; }
+  if(!result || result.ok === false){ paintImportPreview({ok:false, error:(result&&result.error)||'导入失败'}); return; }
+  closeImportModal();
+  try{ state = Store.load(); }
+  catch(e){ toast('导入已完成，但重新载入失败：'+e.message); return; }
+  if(simTimer){ clearInterval(simTimer); simTimer=null; }
+  renderDeviceStats();
+  reloadUI(); fillSettings(); if(typeof renderTask==='function') renderTask();
+  toast('导入完成（'+(mode==='replace'?'替换':'合并')+'）');
+}
+/* 老原生 / 预览桥：整库替换，保持原有交互 */
+function legacyImportFlow(text){
+  if(state.set.motionTask){toast('当前有未完成任务，不能导入覆盖');return;}
+  try{
+    const data=MotionCore.validateBackup(JSON.parse(text.replace(/^\uFEFF/,'')));
+    confirmDialog('导入并替换本机数据',`备份包含 ${Object.keys(data.samples).length} 个样本。将替换本机样本和记录，建议先导出当前备份。`,()=>{
+      if(state.set.motionTask){toast('请先处理当前任务');return;}
+      try{state=Store.replace(text);}catch(e){toast('导入失败，原数据已保留：'+e.message);return;}
+      if(simTimer){clearInterval(simTimer);simTimer=null;}
+      renderDeviceStats();
+      reloadUI();fillSettings();if(typeof renderTask==='function')renderTask();toast('导入成功');
+    });
+  }catch(e){toast('导入失败：'+e.message);}
+}
+function bindImportUI(){
+  const on=(sel,evt,fn)=>{const el=$(sel);if(el)el.addEventListener(evt,fn);};
+  on('#importClose','click',closeImportModal);
+  on('#importCancel','click',closeImportModal);
+  on('#importConfirm','click',confirmImport);
+  on('#importFilterBtn','click',()=>requestImportPreview(importFilterJsonFromInput()));
+  const modal=$('#importModal');
+  if(modal)modal.addEventListener('click',e=>{if(e.target===e.currentTarget)closeImportModal();});
 }
 function importData(e){
   const f = e.target.files && e.target.files[0];
@@ -769,8 +1184,8 @@ function tempSerialLog(raw,kind='rec'){
 
 /* ==================== 传感器噪声处理（EMA 平滑 + 去抖 + 告警记录冷却） ==================== */
 const EMA_ALPHA = 0.3;
-const DEBOUNCE_COUNT = 5;
-const ALERT_COOLDOWN_MS = 10000;
+const DEBOUNCE_MS = 3000;
+const ALERT_COOLDOWN_MS = 3000;
 const sensorRt = new Map();
 const channelSmooth = new Map();
 
@@ -781,7 +1196,7 @@ function emaSmooth(prev,next,alpha){
 }
 function rtOf(id){
   let runtime=sensorRt.get(id);
-  if(!runtime){runtime={smooth:null,pendTarget:null,pendCount:0,lastLogAt:0};sensorRt.set(id,runtime);}
+  if(!runtime){runtime={smooth:null,pendTarget:null,pendSince:0,lastLogAt:0};sensorRt.set(id,runtime);}
   return runtime;
 }
 function logAlertChange(sample,previous,next,temp,id){
@@ -794,7 +1209,8 @@ function logAlertChange(sample,previous,next,temp,id){
   else return;
   if(now-runtime.lastLogAt<ALERT_COOLDOWN_MS)return;
   runtime.lastLogAt=now;
-  addRecord(sample.name,type,detail,id,false);
+  // 告警/恢复由温度板数据触发
+  addRecord(sample.name,type,detail,id,false,'hardware');
 }
 
 function updateTemperatureLive(d,format='串口'){
@@ -934,13 +1350,13 @@ function applySensorData(d){
   const channel=MotionCore.temperatureChannels[d.channel];
   if(channel){
     const targets=Object.values(state.s.samples).filter(x=>x.status!=='out'&&MotionCore.categoryCodes[x.type]===channel.category);
-    targets.forEach(x=>{appendTempPoint(x.id,d.t);updateSampleSensor(x.id,d);});
+    targets.forEach(x=>{updateSampleSensor(x.id,d);appendTempPoint(x.id,d.t,x.alert==='warn'||x.alert==='bad');});
     renderRack();refreshStats();return;
   }
   let tid = null;
   if(d.id && state.s.samples[d.id]) tid = d.id;
   else if(!d.id){ const m = Object.values(state.s.samples).find(x=>x.monitor); if(m) tid = m.id; }
-  if(tid){ appendTempPoint(tid,d.t);updateSampleSensor(tid,d); }
+  if(tid){updateSampleSensor(tid,d);const sample=state.s.samples[tid];appendTempPoint(tid,d.t,sample.alert==='warn'||sample.alert==='bad');}
   renderRack();
   refreshStats();
 }
@@ -954,6 +1370,7 @@ const TEMP_RAW_WINDOW_MS=30*60*1000;
 const TEMP_BUCKET_MS=60*1000;
 const TEMP_RETENTION_MS=7*24*60*60*1000;
 const TEMP_RAW_MAX=4000;
+const TEMP_ABNORMAL_MAX=130000;
 function ensureTemp(id){
   let series=state.set['templog:'+id];
   if(!series){series={raw:[],agg:[]};state.set['templog:'+id]=series;}
@@ -965,18 +1382,18 @@ function rollTemp(id,now){
   while(i<series.raw.length&&series.raw[i].ts<rawCut){
     const point=series.raw[i],minute=Math.floor(point.ts/TEMP_BUCKET_MS)*TEMP_BUCKET_MS;
     const last=series.agg.length?series.agg[series.agg.length-1]:null;
-    if(last&&last.ts===minute&&typeof last.n==='number'){last.t=(last.t*last.n+point.t)/(last.n+1);last.n++;}
-    else series.agg.push({ts:minute,t:point.t,n:1});
+    if(last&&last.ts===minute&&typeof last.n==='number'){last.t=(last.t*last.n+point.t)/(last.n+1);last.n++;if(point.ab)last.ab=1;}
+    else series.agg.push({ts:minute,t:point.t,n:1,ab:point.ab?1:0});
     i++;
   }
   if(i>0)series.raw=series.raw.slice(i);
-  let j=0;while(j<series.agg.length&&series.agg[j].ts<retain)j++;
-  if(j>0)series.agg=series.agg.slice(j);
+  if(series.agg.some(point=>point.ts<retain&&!point.ab))series.agg=series.agg.filter(point=>point.ab||point.ts>=retain);
+  if(series.agg.length>TEMP_ABNORMAL_MAX)series.agg=series.agg.slice(-TEMP_ABNORMAL_MAX);
 }
-function appendTempPoint(id,temp){
+function appendTempPoint(id,temp,abnormal=false){
   if(temp==null||!Number.isFinite(temp))return;
   const series=ensureTemp(id),now=Date.now();
-  series.raw.push({ts:now,t:temp});
+  series.raw.push({ts:now,t:temp,ab:abnormal?1:0});
   if(series.raw.length>TEMP_RAW_MAX)series.raw=series.raw.slice(-TEMP_RAW_MAX);
   rollTemp(id,now);
   if($('#view-monitor').classList.contains('active') && id === monitorSelId) renderMonitorCharts();
@@ -1004,12 +1421,11 @@ function updateSampleSensor(id, d){
     else if(t>hi-2.5||t<lo+2.5)target='warn';
   }
   const current=x.alert||'good';
-  if(target===current){runtime.pendTarget=null;runtime.pendCount=0;}
-  else if(runtime.pendTarget===target)runtime.pendCount++;
-  else{runtime.pendTarget=target;runtime.pendCount=1;}
-  const fire=runtime.pendTarget!=null&&runtime.pendCount>=DEBOUNCE_COUNT;
+  if(target===current){runtime.pendTarget=null;runtime.pendSince=0;}
+  else if(runtime.pendTarget!==target){runtime.pendTarget=target;runtime.pendSince=Date.now();}
+  const fire=runtime.pendTarget!=null&&Date.now()-runtime.pendSince>=DEBOUNCE_MS;
   if(fire){
-    const previous=current;x.alert=runtime.pendTarget;runtime.pendTarget=null;runtime.pendCount=0;
+    const previous=current;x.alert=runtime.pendTarget;runtime.pendTarget=null;runtime.pendSince=0;
     logAlertChange(x,previous,x.alert,t,id);saveAll();
   }else scheduleSensorSave();
   recomputeStats();
@@ -1173,6 +1589,9 @@ function renderTemperatureRanges(){
 function init(){
   // 安卓首次启动保持空库，不自动生成示例样本。
   addSampleBtnInit();
+  bindRecordFilters();
+  bindImportUI();
+  installExportCard();
   recomputeStats(); refreshStats();
   renderLibrary();
   renderRecords();
@@ -1188,7 +1607,8 @@ function init(){
 
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape'){
-    if($('#detailModal').classList.contains('open')) $('#detailModal').classList.remove('open');
+    if($('#importModal') && $('#importModal').classList.contains('open')) closeImportModal();
+    else if($('#detailModal').classList.contains('open')) $('#detailModal').classList.remove('open');
     else if($('#sampleModal').classList.contains('open')) $('#sampleModal').classList.remove('open');
   }
 });

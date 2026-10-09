@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
     @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag") // pre-33 branch is protected by our signature permission; 33+ explicitly NOT_EXPORTED.
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        VitalsDbHelper.appVersion = BuildConfig.VERSION_NAME; // 备份自描述里的 appVersion，避免数据层依赖生成的 BuildConfig
         dbHelper = new VitalsDbHelper(this);
         backupManager = new BackupManager(this, dbHelper);
         usb = (UsbManager)getSystemService(USB_SERVICE);
@@ -265,12 +266,26 @@ public class MainActivity extends Activity {
         @JavascriptInterface public String getSampleByBarcode(String code){return databaseCall(() -> dbHelper.getSample(code,true));}
         @JavascriptInterface public String getRecords(String sampleId){return databaseCall(() -> dbHelper.getRecords(sampleId));}
         @JavascriptInterface public String getSettings(){return databaseCall(() -> dbHelper.getSettings());}
+        /** 契约B：单事务一致读，替代 getDatabaseInfo+getSamples+getRecords+getSettings 的四次调用。 */
+        @JavascriptInterface public String snapshot(){return databaseCall(() -> dbHelper.snapshot());}
+        /** 契约A：按需取照片，full=true 才返回全图 base64；缺文件时 missing=true，绝不抛异常。 */
+        @JavascriptInterface public String getSamplePhoto(String id,boolean full){return databaseCall(() -> dbHelper.getSamplePhoto(id,full));}
+        /** 契约C：记录分页（id DESC，limit 默认 200/上限 500）。 */
+        @JavascriptInterface public String recordsPage(String fromIso,String toIso,String typeCode,int limit,int offset){return databaseCall(() -> dbHelper.recordsPage(fromIso,toIso,typeCode,limit,offset));}
+        /** 契约G：records/samples/env 三种 CSV，返回值即为带 BOM 的 CSV 文本。 */
+        @JavascriptInterface public String exportCsv(String kind,String optionsJson){return databaseCall(() -> dbHelper.exportCsv(kind,optionsJson));}
         @JavascriptInterface public String saveSample(String payload,String record){return databaseMutation(() -> dbHelper.saveSample(new JSONObject(payload),optionalRecord(record)));}
         @JavascriptInterface public String deleteSample(String id,String record){return databaseMutation(() -> dbHelper.deleteSample(id,optionalRecord(record)));}
         @JavascriptInterface public String addRecord(String payload){return databaseMutation(() -> dbHelper.addRecord(new JSONObject(payload)));}
         @JavascriptInterface public String setSetting(String key,String jsonValue){return databaseMutation(() -> dbHelper.setSetting(key,new JSONTokener(jsonValue).nextValue()));}
         @JavascriptInterface public String commitChanges(String payload){return databaseMutation(() -> dbHelper.commit(new JSONObject(payload)));}
+        /** 旧 1 参入口：保持整体替换语义（自动备份文件与旧前端仍在使用）。 */
         @JavascriptInterface public String importBackup(String payload){return databaseMutation(() -> dbHelper.replaceBackup(payload));}
+        /** 契约F：新版导入（preview/replace/merge + 子集恢复）。与旧 importBackup 必须是不同方法名：@JavascriptInterface 不支持同名重载。
+         *  filterJson 形如 {"onlySampleIds":[...],"onlyCodes":[...]}，可传 null/""。 */
+        @JavascriptInterface public String importBackupEx(String payload,String mode,String filterJson){return databaseMutation(() -> dbHelper.importBackupEx(payload,mode,filterJson));}
+        /** 契约F：includePhotos=true 时把外置照片读回 base64 内嵌，便于换机完整迁移（体积大）。 */
+        @JavascriptInterface public String exportBackup(boolean includePhotos){return databaseCall(() -> dbHelper.exportBackup(includePhotos));}
         @JavascriptInterface public String getBackup(){return databaseCall(() -> dbHelper.exportBackup());}
         @JavascriptInterface public String getBackupStatus(){return databaseCall(() -> backupManager.status());}
         @JavascriptInterface public void chooseBackupDirectory(){
@@ -289,10 +304,12 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void downloadUpdate(String tag,long size,String sha256){downloadUpdateAsync(tag,size,sha256);}
         @JavascriptInterface public void installUpdate(){installUpdateAsync();}
         @JavascriptInterface public void exportJson(String filename,String content) {
+            // MIME 按文件名扩展名推断：CSV 若仍声明 application/json，系统选择器会过滤掉 .csv 并让 Excel 打不开。
+            final String mime = filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".csv") ? "text/csv" : "application/json";
             runOnUiThread(() -> {
                 if(exportContent!=null) { event("export","","已有导出窗口，请先完成或取消"); return; }
                 exportContent=content;
-                try { startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/json").putExtra(Intent.EXTRA_TITLE,filename),1); }
+                try { startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE,filename),1); }
                 catch(Exception e) { exportContent=null; event("export","","无法打开文件选择器"); }
             });
         }
@@ -467,7 +484,7 @@ public class MainActivity extends Activity {
                 if(req==2) {
                     try(InputStream in=getContentResolver().openInputStream(uri); ByteArrayOutputStream out=new ByteArrayOutputStream()) {
                         if(in==null)throw new IOException("无法读取");byte[] b=new byte[8192];int n;
-                        while((n=in.read(b))!=-1){if(out.size()+n>20*1024*1024)throw new IOException("备份超过 20MB，请分批迁移");out.write(b,0,n);}
+                        while((n=in.read(b))!=-1){if(out.size()+n>20*1024*1024)throw new IOException("备份超过 20MB，请改用不含照片的备份或分批迁移");out.write(b,0,n);}
                         event("import","",out.toString("UTF-8"));
                     }
                 }

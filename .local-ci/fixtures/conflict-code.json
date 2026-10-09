@@ -1,0 +1,47 @@
+{
+  "app": "vitals-biosample",
+  "schemaVersion": 4,
+  "appVersion": "1.19.3",
+  "exportedAt": "2026-10-09T08:00:00+08:00",
+  "counts": {
+    "samples": 1,
+    "records": 0
+  },
+  "checksum": "sha256:0659f8a7d82b1e0d0bdff22abeb47609170bf4854e0c7f47a9d7f88f17f7b8a9",
+  "samples": {
+    "SB-10003": {
+      "id": "SB-10003",
+      "name": "条码冲突样本",
+      "code": "SB-90001",
+      "type": "血浆",
+      "status": "in",
+      "slot": 3,
+      "loc": "圆盘-2",
+      "timeTxt": "2026-10-09 08:00",
+      "timeRaw": "2026-10-09T08:00",
+      "temp": 4.2,
+      "monitor": false,
+      "alert": "good",
+      "createdAt": 1759968000000,
+      "updatedAt": 1759968000000,
+      "pendingIntake": false,
+      "env": [
+        {
+          "time": "2026-10-09T08:00",
+          "temp": 4.2
+        },
+        {
+          "time": "2026-10-09T08:01",
+          "temp": 4.3
+        }
+      ]
+    }
+  },
+  "records": [],
+  "settings": {
+    "hi": 8,
+    "lo": -88,
+    "simOn": false,
+    "online": 0
+  }
+}

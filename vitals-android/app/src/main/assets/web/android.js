@@ -167,7 +167,7 @@ function renderTask(){
   }
   $('#abortTask').onclick=()=>confirmDialog('人工核实后结束任务','这不会停止电机。请先确认机械已停止，样本已恢复到操作前的位置；否则取消并继续保留待核实任务。',()=>{
     state.set.motionTask=null;
-    state.rec.unshift({time:FMT.now(),sample:state.s.samples[t.sampleId]?.name||t.sampleId,sampleId:t.sampleId,code:state.s.samples[t.sampleId]?.code||null,slot:t.slot,taskId:t.taskId,type:'任务取消',detail:'人工确认恢复原状态：'+t.taskId});
+    state.rec.unshift({time:FMT.now(),sample:state.s.samples[t.sampleId]?.name||t.sampleId,sampleId:t.sampleId,code:state.s.samples[t.sampleId]?.code||null,slot:t.slot,taskId:t.taskId,type:'任务取消',detail:'人工确认恢复原状态：'+t.taskId,...recordMeta('任务取消','manual')});
     if(!saveAll())return;
     clearTimeout(taskTimer);reloadUI();renderTask();
   });
@@ -183,8 +183,8 @@ function finishTask(){
   x.status=t.action;x.pendingIntake=false;x.updatedAt=Date.now();
   if(t.action==='in'){x.slot=t.slot;x.loc=MotionCore.slotLabel(x.type,t.slot);delete x.plannedSlot;}else{x.lastSlot=t.slot;delete x.slot;x.loc='已出库';}
   state.set.motionTask=null;
-  state.rec.unshift({time:FMT.now(),sample:x.name,sampleId:x.id,code:x.code||null,slot:t.slot,status:t.action,taskId:t.taskId,type:t.action==='in'?'入库':'出库',detail:`人工确认完成，${MotionCore.slotLabel(x.type,t.slot)}，任务 ${t.taskId}`});
-  state.rec=state.rec.slice(0,500);
+  state.rec.unshift({time:FMT.now(),sample:x.name,sampleId:x.id,code:x.code||null,slot:t.slot,status:t.action,taskId:t.taskId,type:t.action==='in'?'入库':'出库',detail:`人工确认完成，${MotionCore.slotLabel(x.type,t.slot)}，任务 ${t.taskId}`,...recordMeta(t.action==='in'?'入库':'出库',t.mode==='hardware'?'hardware':'manual')});
+  if(state.rec.length>RECORD_LOCAL_MAX)state.rec.length=RECORD_LOCAL_MAX;
   if(!saveAll())return;
   clearTimeout(taskTimer);reloadUI();renderTask();toast('库存已更新');
 }
@@ -193,8 +193,8 @@ function finishHardwareOutbound(t){
   const x=state.s.samples[t.sampleId];if(!x||x.status==='out')return false;
   x.status='out';x.pendingIntake=false;x.updatedAt=Date.now();x.lastSlot=t.slot;delete x.slot;x.loc='已出库';
   state.set.motionTask=null;scannerVerification=null;
-  state.rec.unshift({time:FMT.now(),sample:x.name,sampleId:x.id,code:x.code||null,slot:t.slot,status:'out',taskId:t.taskId,type:'出库',detail:`机械板返回 OK，自动完成出库并释放${MotionCore.slotLabel(x.type,t.slot)}，任务 ${t.taskId}`});
-  state.rec=state.rec.slice(0,500);
+  state.rec.unshift({time:FMT.now(),sample:x.name,sampleId:x.id,code:x.code||null,slot:t.slot,status:'out',taskId:t.taskId,type:'出库',detail:`机械板返回 OK，自动完成出库并释放${MotionCore.slotLabel(x.type,t.slot)}，任务 ${t.taskId}`,...recordMeta('出库','hardware')});
+  if(state.rec.length>RECORD_LOCAL_MAX)state.rec.length=RECORD_LOCAL_MAX;
   if(!saveAll())return false;
   clearTimeout(taskTimer);reloadUI();renderTask();toast('机械板返回 OK，样本已出库');return true;
 }
@@ -210,17 +210,10 @@ function scanCode(text){
 }
 function receiveImport(text){
   if(state.set.motionTask){toast('当前有未完成任务，不能导入覆盖');return;}
-  try{
-    const data=MotionCore.validateBackup(JSON.parse(text.replace(/^\uFEFF/,'')));
-    confirmDialog('导入并替换本机数据',`备份包含 ${Object.keys(data.samples).length} 个样本。将替换本机样本和记录，建议先导出当前备份。`,()=>{
-      if(state.set.motionTask){toast('请先处理当前任务');return;}
-      // Native helper validates again, then replaces all three tables in one transaction.
-      try{state=Store.replace(text);}catch(e){toast('导入失败，原数据已保留：'+e.message);return;}
-      if(simTimer){clearInterval(simTimer);simTimer=null;}
-      renderDeviceStats();
-      reloadUI();fillSettings();renderTask();toast('导入成功');
-    });
-  }catch(e){toast('导入失败：'+e.message);}
+  // 新原生有 importBackupEx：先预览差异、再由用户确认合并/替换（见 app.js）。
+  // 老原生 / 网页预览桥没有该桥方法时退回一次性整库替换流程。
+  if(Store.canPreviewImport()&&typeof openImportPreview==='function'){openImportPreview(text);return;}
+  legacyImportFlow(text);
 }
 window.onAndroidEvent=(type,role,text)=>{
   if(type==='devices'&&role==='external'){applyExternalDevices(text);return;}
@@ -313,7 +306,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       const id=$('#bindSample').value,slot=Number($('#motionSlot').value);
       if(!MotionCore.slotFree(state.s.samples,type,slot,id)){toast(type+'圆盘的该槽位已被占用');return;}
       state.s.samples[id].slot=slot;state.s.samples[id].loc=MotionCore.slotLabel(type,slot);
-      state.rec.unshift({time:FMT.now(),sample:state.s.samples[id].name,sampleId:id,code:state.s.samples[id].code||null,slot,status:'in',type:'槽位绑定',detail:'人工核实：'+MotionCore.slotLabel(type,slot)});
+      state.rec.unshift({time:FMT.now(),sample:state.s.samples[id].name,sampleId:id,code:state.s.samples[id].code||null,slot,status:'in',type:'槽位绑定',detail:'人工核实：'+MotionCore.slotLabel(type,slot),...recordMeta('槽位绑定','manual')});
+      if(state.rec.length>RECORD_LOCAL_MAX)state.rec.length=RECORD_LOCAL_MAX;
       if(!saveAll())return;
       dialog.remove();reloadUI();toast('已绑定');
     };
