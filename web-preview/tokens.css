@@ -1,0 +1,153 @@
+/* onemotion · tokens.css ─────────────────────────────────────────────────────
+   动效 token 的唯一落地点。所有数字来自 _contract.md「冻结 token 表」，
+   lib/motion.js 的 MO.tokens 是同一批值的 JS 副本 —— 改这里必须同步改那里。
+
+   用法：<link rel="stylesheet" href="tokens.css">
+         transition: transform var(--dur-base) var(--ease-enter);
+   禁止：裸 0.3s / ease-in-out / 全属性过渡（transition 必须点名属性）。
+
+   ── 实测值（本机按 `api.md` §2 的公式算出，并用 MO.t80 / MO.springSpec 复核过）────────
+   时长   80 · 140 · 220 · 340 · 500 ms。同屏最快:最慢 = 80:500 = 1:6.25（规范要求 ≥4×）。
+   缓动   t80 = 走完 80% 距离所用的时间比例（低=先冲后收，高=先慢后冲）
+          --ease-standard   t50 .350  t80 .520  t95 .726   双向：移动、尺寸、重排
+          --ease-enter      t50 .062  t80 .215  t95 .499   进入（快起慢收）
+          --ease-exit       t50 .810  t80 .944  t95 .988   退出（慢起快走）
+          --ease-emphasized t50 .200  t80 .398  t95 .656   大位移 / 全屏（强减速）
+          --ease-linear     t50 .500  t80 .800  t95 .950   只允许跟手 / scrub / 进度
+   弹簧   过冲 / 落位(2%) / t80(占自身时长比例)。ζ = 1 − bounce，ω = 2π/duration。
+          --spring-snappy  ζ.85 ω17.95  0.6% / 0.233s / .410  ← 默认（状态、按钮、图标）
+          --spring-smooth  ζ1.00 ω12.57  0  % / 0.464s / .477  ← 位置·尺寸，无过冲
+          --spring-bouncy  ζ.70 ω12.57  4.6% / 0.476s / .356  ← 出现、弹层（过冲上限）
+          --spring-drag    ζ.85 ω14.00  0.6% / 0.299s / .410  ← 松手收敛、惯性落位
+          --spring-sheet   ζ.90 ω16.00  0.2% / 0.294s / .431  ← 抽屉 / sheet
+          --spring-firm    ζ.60 ω20.00  9.5% / 0.297s / .326  ← 明显弹性，一处页面最多一次
+   幅度   位移 8 / 16 / 24 / 40px（内容位移上限 24px，只有抽屉·全屏允许 40px）
+          进入 scale .96（不许小于 .9）· 强调 scale 1.04（不许大于 1.06）
+   错峰   20 / 35 / 60ms，总时长 ≤240ms（>8 项只错前 8 项，>12 项整块淡入）
+   景深   --blur-depth ≤8px，只用于 scrim / 景深，禁止当运动模糊用
+
+   ── linear() 是怎么来的（不是抄的，是算的）────────────────────────────────
+   弹簧阶跃响应：x(t) = 1 − e^(−ζωt)·(cos(ωd·t) + (ζω/ωd)·sin(ωd·t))，ωd = ω√(1−ζ²)
+   在 t ∈ [0, 2π/ω] 上等距取 33 点（32 步）→ 逗号列表。duration = 2π/ω = 上表的落位时长。
+   所以 --spring-* 必须配 --dur-spring-* 使用；把 spring 当成"曲线"、把时长当成"轴"。
+   生成命令（lib 未就绪时可自算，lib 就绪后用它复核，两者输出逐字节相同）：
+     node -e "const MO=require('./lib/motion.js');for(const t of ['snappy','smooth','bouncy','drag','sheet','firm'])console.log(t,MO.springSpec(t).css)"
+   注：ζ 相同的两个 token（snappy / drag）采样列表逐点相同 —— ω 的差别只体现在 duration 上。
+   注：smooth 是临界阻尼，渐近到 1，在 t = 2π/ω 处只到 .9864（末帧差 1.4%），这是时长 token 定义的固有结果。
+
+   ── 颜色 / 字体不是 motion token ──
+   本文件只导出动效数字（`api.md` §2 的变量逐个覆盖，无遗漏）。
+   色板与字体栈由各页面自己的 :root 定义，避免"token 文件"变成万能垃圾桶。
+
+   ── 附加的派生变量（`api.md` §2 冻结名之外的补充，不修改任何冻结值）──
+   --dur-spring-* ：弹簧的自然时长（round(2π/ω·1000)），让纯 CSS 也能用弹簧而不写裸数字；
+                    reduced-motion 下同样被压到 1ms，否则弹簧会带着 350ms 的位移穿过 reduce 分支。
+   --spring-firm  ：`api.md` §2 弹簧表里有、导出清单里省略的一个；这里补上，标注"少用"。
+───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* 时长：按"变化多大"分，不按组件分 */
+  --dur-instant: 80ms;   /* 按压 / hover / 颜色·亮度反馈，必须一帧内被感知 */
+  --dur-fast: 140ms;     /* 图标切换、tooltip、checkbox、chip */
+  --dur-base: 220ms;     /* 默认：卡片/行进入、状态切换、按钮展开 */
+  --dur-slow: 340ms;     /* 容器尺寸/布局变化、抽屉、popover、列表重排 */
+  --dur-slower: 500ms;   /* 全屏/页面级转场、sheet 全开、drill-in（上限） */
+
+  /* 缓动 */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);      /* t80 .520 */
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);      /* t80 .215 进入专用 */
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);       /* t80 .944 退出专用 */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);      /* t80 .398 强减速 */
+  --ease-linear: linear;                              /* 只允许跟手 / scrub / 进度 */
+
+  /* 弹簧（32 步 linear()，真数字） */
+  --spring-snappy: linear(0.0000,0.0172,0.0617,0.1242,0.1976,0.2764,0.3564,0.4348,0.5094,0.5788,0.6423,0.6995,0.7503,0.7948,0.8334,0.8665,0.8945,0.9180,0.9376,0.9536,0.9666,0.9770,0.9852,0.9916,0.9964,1.0000,1.0025,1.0043,1.0054,1.0060,1.0063,1.0062,1.0060);
+  --spring-smooth: linear(0.0000,0.0169,0.0596,0.1183,0.1860,0.2575,0.3294,0.3993,0.4656,0.5273,0.5840,0.6355,0.6819,0.7233,0.7601,0.7925,0.8210,0.8460,0.8677,0.8866,0.9029,0.9171,0.9292,0.9397,0.9487,0.9564,0.9630,0.9686,0.9734,0.9775,0.9809,0.9839,0.9864);
+  --spring-bouncy: linear(0.0000,0.0176,0.0639,0.1306,0.2105,0.2976,0.3875,0.4763,0.5614,0.6407,0.7131,0.7777,0.8343,0.8828,0.9236,0.9572,0.9841,1.0051,1.0209,1.0322,1.0396,1.0440,1.0458,1.0457,1.0440,1.0413,1.0378,1.0339,1.0298,1.0257,1.0217,1.0180,1.0145);
+  --spring-drag: linear(0.0000,0.0172,0.0617,0.1242,0.1976,0.2764,0.3564,0.4348,0.5094,0.5788,0.6423,0.6995,0.7503,0.7948,0.8334,0.8665,0.8945,0.9180,0.9376,0.9536,0.9666,0.9770,0.9852,0.9916,0.9964,1.0000,1.0025,1.0043,1.0054,1.0060,1.0063,1.0062,1.0060);
+  --spring-sheet: linear(0.0000,0.0171,0.0610,0.1222,0.1936,0.2698,0.3470,0.4224,0.4940,0.5606,0.6217,0.6768,0.7260,0.7694,0.8073,0.8402,0.8685,0.8926,0.9130,0.9301,0.9444,0.9563,0.9660,0.9740,0.9804,0.9855,0.9896,0.9928,0.9953,0.9972,0.9986,0.9996,1.0004);
+  --spring-firm: linear(0.0000,0.0178,0.0655,0.1351,0.2198,0.3134,0.4109,0.5080,0.6016,0.6892,0.7691,0.8401,0.9017,0.9537,0.9964,1.0302,1.0559,1.0743,1.0863,1.0928,1.0948,1.0931,1.0886,1.0820,1.0739,1.0651,1.0558,1.0466,1.0378,1.0295,1.0219,1.0152,1.0093);
+
+  /* 弹簧的自然时长（派生，见文件头） */
+  --dur-spring-snappy: 350ms;   /* 2π/17.95 */
+  --dur-spring-smooth: 500ms;   /* 2π/12.57 */
+  --dur-spring-bouncy: 500ms;   /* 2π/12.57 */
+  --dur-spring-drag: 449ms;     /* 2π/14.00 */
+  --dur-spring-sheet: 393ms;    /* 2π/16.00 */
+  --dur-spring-firm: 314ms;     /* 2π/20.00 */
+
+  /* 幅度 */
+  --move-sm: 8px;    /* 小元素、图标、chip */
+  --move-md: 16px;   /* 卡片、行、默认进入位移 */
+  --move-lg: 24px;   /* 面板、区块进入（内容位移上限） */
+  --move-xl: 40px;   /* 抽屉 / 全屏 sheet —— 只有它还允许大位移 */
+  --scale-in: 0.96;  /* 进入起始 scale，不许小于 0.9 */
+  --scale-pop: 1.04; /* 强调态上限，不许大于 1.06 */
+
+  /* 错峰 */
+  --stagger-tight: 20ms;  /* 密集列表项 */
+  --stagger-base: 35ms;   /* 默认 */
+  --stagger-loose: 60ms;  /* 标题 → 正文的层级差 */
+
+  /* 景深模糊（只用于 scrim / 景深） */
+  --blur-depth: 8px;
+}
+
+/* linear() 不支持的浏览器：把弹簧退化成 --ease-emphasized（t80 .398，唯一能近似"快起微停"的缓动）。
+   JS 侧同一探测：CSS.supports('transition-timing-function', 'linear(0, 0.5, 1)')——必须用【属性名】；
+   写成 CSS.supports('easing-function', …) 在 Chrome 里也返回 false（那是数据类型不是属性名），
+   会让所有支持 linear() 的浏览器被误判成不支持。退化策略必须与这里一致，不许退成 ease-in-out。 */
+@supports not (transition-timing-function: linear(0, 0.5, 1)) {
+  :root {
+    --spring-snappy: var(--ease-emphasized);
+    --spring-smooth: var(--ease-emphasized);
+    --spring-bouncy: var(--ease-emphasized);
+    --spring-drag: var(--ease-emphasized);
+    --spring-sheet: var(--ease-emphasized);
+    --spring-firm: var(--ease-emphasized);
+  }
+}
+
+/* reduced-motion：时长压到 1ms（不是 0，0 会让 transitionend 不触发）、
+   位移/缩放/视差归零，保留 opacity 与颜色反馈。
+   绝不把动画整体关掉（那会连"按下去有反应"一起删掉）。 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 1ms;
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+    --dur-slower: 1ms;
+    --dur-spring-snappy: 1ms;
+    --dur-spring-smooth: 1ms;
+    --dur-spring-bouncy: 1ms;
+    --dur-spring-drag: 1ms;
+    --dur-spring-sheet: 1ms;
+    --dur-spring-firm: 1ms;
+    --move-sm: 0px;
+    --move-md: 0px;
+    --move-lg: 0px;
+    --move-xl: 0px;
+    --scale-in: 1;
+    --scale-pop: 1;
+    /* 弹簧是"位移的曲线"，reduce 下必须失去位移语义；时长已 1ms，这里再退成线性，
+       避免 linear() 的过冲把 1ms 的一帧变成一次可见的抖动。 */
+    --spring-snappy: linear;
+    --spring-smooth: linear;
+    --spring-bouncy: linear;
+    --spring-drag: linear;
+    --spring-sheet: linear;
+    --spring-firm: linear;
+  }
+}
+
+/* ── 项目别名：本应用（生息样本库）在 styles.css 里沿用同一套 token 名，
+      这里只加一个语义别名层，不新增第 6 个时长、不改任何冻结值。 ── */
+:root {
+  /* 语义名 → 冻结 token（读的时候知道"这个动效在回答什么问题"） */
+  --motion-press: var(--dur-instant);      /* 按压 / 命中反馈 */
+  --motion-state: var(--dur-fast);         /* 筛选选中、图标、chip 状态 */
+  --motion-move: var(--dur-base);          /* 卡片/行位移、列表重排 */
+  --motion-surface: var(--dur-slow);        /* 面板、抽屉、弹窗 */
+  --motion-page: var(--dur-slower);        /* 页面级转场（上限） */
+}

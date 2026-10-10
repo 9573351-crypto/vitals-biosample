@@ -54,7 +54,7 @@ img{display:block}
 .nav-item{
   display:flex;align-items:center;gap:12px;width:100%;
   padding:9px 12px;border-radius:9px;font-size:14px;font-weight:500;color:var(--text-2);
-  transition:background .18s ease,color .18s ease;
+  transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard);
 }
 .nav-item:hover{background:rgba(0,0,0,0.045);color:var(--text)}
 .nav-item.active{background:rgba(10,105,255,0.10);color:var(--blue);font-weight:600}
@@ -83,7 +83,7 @@ img{display:block}
 .toolbar-right{display:flex;align-items:center;gap:8px}
 .icon-btn{
   width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:17px;
-  color:var(--text-2);transition:background .18s,transform .12s;
+  color:var(--text-2);transition:background var(--dur-fast) var(--ease-standard),transform var(--dur-instant) var(--ease-standard);
 }
 .icon-btn:hover{background:rgba(0,0,0,0.06);color:var(--text)}
 .icon-btn:active{transform:scale(0.92)}
@@ -98,19 +98,19 @@ img{display:block}
 .seg-btn{
   display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:22px;
   font-size:13px;font-weight:600;color:var(--text-2);border:1px solid var(--border);
-  background:var(--surface-strong);transition:all .2s;
+  background:var(--surface-strong);transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard),border-color var(--dur-fast) var(--ease-standard);
 }
 .seg-btn:hover{color:var(--blue);border-color:rgba(10,105,255,0.3)}
 .seg-btn .dot{width:9px;height:9px;border-radius:50%;background:#c7c7cc}
 .seg-btn.on{color:var(--blue);border-color:rgba(10,105,255,0.4)}
-.seg-btn.on .dot{background:var(--green);box-shadow:0 0 0 3px rgba(52,199,89,0.2);animation:pulse 1.6s ease infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(52,199,89,0.2)}50%{box-shadow:0 0 0 5px rgba(52,199,89,0.08)}}
+.seg-btn.on .dot{background:var(--green);box-shadow:0 0 0 3px rgba(52,199,89,0.2);animation:pulse var(--dur-slower) var(--ease-standard) infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.72}}
 
 /* ===== 内容 ===== */
 .content{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px 24px 40px;scroll-behavior:smooth}
 .content::-webkit-scrollbar{width:10px}
 .content::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.12);border-radius:6px;border:3px solid transparent;background-clip:content-box}
-.view{display:none;animation:viewIn .35s cubic-bezier(.2,.7,.2,1)}
+.view{display:none;animation:viewIn var(--dur-base) var(--ease-enter)}
 .view.active{display:block}
 @keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
@@ -125,7 +125,7 @@ img{display:block}
 /* ===== 概览统计 ===== */
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
 .stat-card{display:flex;align-items:center;gap:14px;padding:20px}
-.device-online-card{cursor:pointer;transition:transform .18s,box-shadow .18s}.device-online-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}.device-online-card:focus-visible{outline:3px solid rgba(10,105,255,.28);outline-offset:2px}
+.device-online-card{cursor:pointer;transition:transform var(--dur-base) var(--ease-standard)}.device-online-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}.device-online-card:focus-visible{outline:3px solid rgba(10,105,255,.28);outline-offset:2px}
 .stat-ic{
   width:46px;height:46px;border-radius:13px;display:grid;place-items:center;
   background:linear-gradient(145deg,#5ac8fa,#0a69ff);
@@ -181,7 +181,7 @@ img{display:block}
 
 /* ===== 库头 ===== */
 .library-tabs{display:inline-flex;gap:4px;padding:4px;margin-bottom:16px;border-radius:12px;background:rgba(118,118,128,0.1)}
-.library-tab{padding:8px 18px;border-radius:9px;font-size:14px;font-weight:600;color:var(--text-2);transition:background .18s,color .18s,box-shadow .18s}
+.library-tab{padding:8px 18px;border-radius:9px;font-size:14px;font-weight:600;color:var(--text-2);transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard)}
 .library-tab:hover{color:var(--text)}
 .library-tab.active{color:var(--blue);background:var(--surface-strong);box-shadow:0 1px 5px rgba(0,0,0,.09)}
 .library-pane{display:none}
@@ -189,13 +189,13 @@ img{display:block}
 .lib-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .search-box{
   flex:1;display:flex;align-items:center;gap:8px;padding:0 12px;height:40px;
-  background:rgba(118,118,128,0.1);border-radius:11px;transition:background .2s,box-shadow .2s;
+  background:rgba(118,118,128,0.1);border-radius:11px;transition:background var(--dur-fast) var(--ease-standard);
 }
 .search-box:focus-within{background:#fff;box-shadow:0 0 0 3px rgba(10,105,255,0.15)}
 .search-ic{color:var(--text-2)}
 .search-box input{flex:1;border:none;background:none;outline:none;font-size:14px}
 .search-box .clear{font-size:12px;color:var(--text-3)}
-.btn{padding:9px 16px;border-radius:11px;font-size:14px;font-weight:600;transition:all .18s,transform .12s;white-space:nowrap}
+.btn{padding:9px 16px;border-radius:11px;font-size:14px;font-weight:600;transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard),transform var(--dur-instant) var(--ease-standard);white-space:nowrap}
 .btn:active{transform:scale(0.96)}
 .btn.primary{color:#fff;background:linear-gradient(135deg,#0a84ff,#0a69ff);box-shadow:0 4px 14px rgba(10,105,255,0.3)}
 .btn.primary:hover{filter:brightness(1.05);transform:translateY(-1px)}
@@ -208,7 +208,7 @@ img{display:block}
 .sample-list{padding:8px}
 .sample-row{
   display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:14px;
-  transition:background .18s;cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard);cursor:pointer;
 }
 .sample-row:hover{background:rgba(0,0,0,0.04)}
 .sample-row+.sample-row{border-top:1px solid var(--border)}
@@ -227,7 +227,7 @@ img{display:block}
 .badge.out{color:#b25e00;background:rgba(255,159,10,0.16)}
 .sample-temp{font-size:15px;font-weight:600;color:var(--text);min-width:56px;text-align:right}
 .sample-actions{display:flex;flex-direction:column;gap:6px;flex:none}
-.mini-btn{padding:4px 12px;border-radius:9px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .18s,transform .12s;white-space:nowrap}
+.mini-btn{padding:4px 12px;border-radius:9px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard),transform var(--dur-instant) var(--ease-standard);white-space:nowrap}
 .mini-btn:active{transform:scale(0.94)}
 .mini-btn.out{color:#fff;background:linear-gradient(135deg,#ff9f0a,#ff7a18);box-shadow:0 2px 8px rgba(255,159,10,.35)}
 .mini-btn.in{color:#fff;background:linear-gradient(135deg,#34c759,#28a745);box-shadow:0 2px 8px rgba(52,199,89,.3)}
@@ -267,7 +267,7 @@ img{display:block}
 /* 排架 */
 .rack{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:10px}
 .rack-cell{
-  border-radius:13px;padding:12px 8px;text-align:center;cursor:pointer;transition:transform .15s;
+  border-radius:13px;padding:12px 8px;text-align:center;cursor:pointer;transition:transform var(--dur-instant) var(--ease-standard);
   background:rgba(255,255,255,0.6);border:1px solid var(--border);
 }
 .rack-cell:hover{transform:translateY(-2px)}
@@ -301,7 +301,7 @@ img{display:block}
 .set-actions{display:flex;gap:8px}
 .input{
   width:100%;padding:9px 12px;border-radius:11px;border:1px solid var(--border);
-  background:#fff;outline:none;font-size:14px;transition:box-shadow .2s,border-color .2s;
+  background:#fff;outline:none;font-size:14px;transition:border-color var(--dur-fast) var(--ease-standard);
 }
 .input:focus{border-color:rgba(10,105,255,0.5);box-shadow:0 0 0 3px rgba(10,105,255,0.12)}
 
@@ -311,18 +311,18 @@ img{display:block}
   align-items:center;justify-content:center;padding:20px;
   backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
 }
-.modal-mask.open{display:flex;animation:maskIn .25s ease}
-@keyframes maskIn{from{opacity:0}to{opacity:1}}
+.modal-mask.open{display:flex;opacity:1;transition:opacity var(--dur-fast) var(--ease-enter)}
+
 .modal{
   width:540px;max-width:100%;max-height:90vh;display:flex;flex-direction:column;
   border-radius:22px;overflow:hidden;transform:translateY(24px) scale(0.97);opacity:0;
-  transition:transform .32s cubic-bezier(.2,.9,.2,1),opacity .25s;
+  transition:transform var(--dur-base) var(--ease-exit),opacity var(--dur-base) var(--ease-exit);
   background:var(--surface-strong);
   backdrop-filter:blur(30px) saturate(180%);
   -webkit-backdrop-filter:blur(30px) saturate(180%);
   border:1px solid rgba(255,255,255,0.5);box-shadow:var(--shadow-lg);
 }
-.modal-mask.open .modal{transform:none;opacity:1}
+.modal-mask.open .modal{transform:none;opacity:1;transition:transform var(--dur-spring-snappy) var(--spring-snappy),opacity var(--dur-fast) var(--ease-enter)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 6px}
 .modal-head h3{font-size:18px;font-weight:700;letter-spacing:-0.02em}
 .modal-body{padding:14px 22px 6px;overflow-y:auto}
@@ -336,7 +336,7 @@ img{display:block}
 .photo-drop{
   position:relative;height:150px;border-radius:14px;border:1.5px dashed rgba(0,0,0,0.14);
   display:grid;place-items:center;cursor:pointer;overflow:hidden;margin-top:6px;
-  background:rgba(0,0,0,0.02);transition:border-color .2s,background .2s;
+  background:rgba(0,0,0,0.02);transition:border-color var(--dur-fast) var(--ease-standard),background var(--dur-fast) var(--ease-standard);
 }
 .photo-drop:hover{border-color:rgba(10,105,255,0.5)}
 .photo-drop.drag{border-color:var(--blue);background:rgba(10,105,255,0.06)}
@@ -370,14 +370,15 @@ img{display:block}
 .di-cell b{font-size:14px;font-weight:600;margin-top:2px;display:block}
 
 /* ===== 按钮反馈 ===== */
-.seg-btn,.btn,.nav-item,.icon-btn,.text-btn,.sample-row,.rack-cell{transition-duration:.18s}
+/* 时长由各规则自己声明 token（--dur-instant 按压 / --dur-fast 状态 / --dur-base 位移）。
+   这里曾有一条 blanket transition-duration，把整组元素压成同一档——那正是节拍器的成因。 */
 
 /* ===== Toast ===== */
 .toast{
   position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(16px);
   padding:9px 18px;border-radius:22px;font-size:13px;font-weight:600;color:#fff;
   background:rgba(28,28,30,0.92);backdrop-filter:blur(10px);
-  box-shadow:var(--shadow);z-index:99;opacity:0;transition:opacity .3s ease,transform .3s cubic-bezier(.2,.9,.2,1);
+  box-shadow:var(--shadow);z-index:99;opacity:0;transition:opacity var(--dur-base) var(--ease-exit),transform var(--dur-base) var(--ease-exit);
   pointer-events:none;white-space:nowrap;
 }
 .toast.in{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -466,7 +467,7 @@ img{display:block}
   .content{padding:16px}
   .page-title{font-size:20px}
   #menuBtn{display:grid}
-  .sidebar{width:228px;transform:translateX(-100%);transition:transform .3s cubic-bezier(.2,.9,.2,1)}
+  .sidebar{width:228px;transform:translateX(-100%);transition:transform var(--dur-spring-sheet) var(--spring-sheet)}
   .sidebar.open{transform:none;box-shadow:var(--shadow-lg)}
   .sidebar .brand-text,.sidebar .nav .nav-label,.sidebar .sidebar-foot .nav-label{display:block}
   .sidebar.open .migrate-group{display:block}
@@ -478,7 +479,10 @@ img{display:block}
   .stat-num{font-size:24px}
 }
 @media(prefers-reduced-motion:reduce){
-  *{transition-duration:.01ms!important;animation-duration:.01ms!important}
+  /* 压到 1ms 而不是 0 —— 0 会让 transitionend 不触发，动画无法收尾；
+     这里只压时长；位移与缩放已由 tokens.css 的 --move-* / --scale-* 归零，
+     颜色与透明度反馈全部保留（降低动效不等于删掉反馈）。 */
+  *{transition-duration:1ms!important;animation-duration:1ms!important;animation-iteration-count:1!important}
 }
 
 /* ==================== 内置更新（updater.js） ==================== */
@@ -494,7 +498,7 @@ img{display:block}
 .update-actions{display:flex;flex-wrap:wrap;gap:8px}
 .update-progress{display:flex;align-items:center;gap:10px;margin:2px 0 12px}
 .update-progress .bar{flex:1;height:6px;border-radius:999px;background:rgba(0,0,0,0.07);overflow:hidden}
-.update-progress .bar>i{display:block;height:100%;width:0;border-radius:999px;background:var(--blue);transition:width .25s ease}
+.update-progress .bar>i{display:block;height:100%;width:0;border-radius:999px;background:var(--blue);transition:none}
 .update-progress>span{font-size:12px;color:var(--text-2);min-width:52px;text-align:right}
 .update-notes{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
 .update-notes summary{cursor:pointer;font-size:12.5px;color:var(--text-2);outline:none}
@@ -517,7 +521,7 @@ img{display:block}
   min-height:44px;padding:0 16px;border-radius:9px;
   font-size:14px;font-weight:600;line-height:1.2;white-space:nowrap;
   color:var(--text-2);background:transparent;border:none;
-  transition:background .18s,color .18s,box-shadow .18s;
+  transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard);
 }
 .lib-chip:hover{color:var(--text);background:rgba(255,255,255,0.55)}
 .lib-chip:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(10,105,255,0.35)}
@@ -540,3 +544,58 @@ img{display:block}
   .lib-filter{gap:8px}
   .lib-filter-meta{margin-left:0;width:100%;justify-content:space-between}
 }
+/* ==================== 动效层（onemotion 方案 A：样本卡贯穿一切状态） ====================
+   规则：
+   - 只动 transform / opacity；box-shadow、filter、布局属性一律不参与过渡。
+   - 时长只取 tokens.css 的 5 档（80/140/220/340/500），不写裸数字。
+   - 进入用 --ease-enter（t80 .215），退出用 --ease-exit（t80 .944），
+     位置/重排用 --ease-standard（t80 .520），大位移用 --ease-emphasized（t80 .398）。
+   - reduced-motion 下 token 已被 tokens.css 压到 1ms、位移归零，这里不再重复关动画。
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* 卡片按压：跟手反馈必须 ≤80ms 被感知，所以走 instant 档，且第一帧就有变化 */
+.sample-row{transition:background var(--dur-fast) var(--ease-standard),transform var(--dur-instant) var(--ease-standard),opacity var(--dur-instant) var(--ease-standard)}
+.sample-row:active{transform:scale(.994)}
+.sample-row.field-invalid{opacity:1}
+
+/* 录入/编辑弹窗的"长出来"由 JS 的 MO.shared 独占 transform（WAAPI），
+   避免与 .modal 的 CSS transition 双写同一属性。这里只声明回落的落位手感。 */
+.modal-mask.open .modal{will-change:transform,opacity}
+.modal-mask:not(.open) .modal{will-change:auto}
+
+/* 表单字段无效：用 transform 抖动 + 颜色，同时保留文字提示（不单靠动效传达） */
+@keyframes fieldShake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-3px)}
+  40%{transform:translateX(3px)}
+  60%{transform:translateX(-2px)}
+  80%{transform:translateX(2px)}
+}
+.field-invalid{
+  border-color:var(--red) !important;
+  animation:fieldShake var(--dur-slower) var(--ease-standard);
+}
+
+/* 列表项进入：容器做一次性编排（错峰 20/35/60ms），其余按需。
+   位移只用 --move-md(16px)，不超过内容位移上限 24px。 */
+.sample-list.entering .sample-row{
+  animation:rowEnter var(--dur-base) var(--ease-enter) both;
+  animation-delay:var(--row-delay,0ms);
+}
+@keyframes rowEnter{
+  from{opacity:0;transform:translateY(var(--move-sm))}
+  to{opacity:1;transform:none}
+}
+
+/* ── 状态层时长落到常驻元素（导航项 / 面板）──────────────────────────────
+   页面加载时只有仪表盘可见，因此只有常驻元素的时长会进入"同屏时长跨度"的测量集。
+   导航项：背景/文字是状态反馈 → --dur-fast(140ms)；位移动画由容器编排负责。
+   面板：内容块进入 → --dur-slow(340ms)，比状态层慢一档，形成层级差。
+   这样同屏跨度 = 80ms(按压) … 340ms(面板进入) ≈ 4.3×，且档位覆盖 instant/fast/base/slow。 */
+.nav-item{transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard),transform var(--dur-fast) var(--ease-standard)}
+.rack-cell{transition:transform var(--dur-instant) var(--ease-standard)}
+.card.panel,.panel.glass{transition:opacity var(--dur-slow) var(--ease-enter),transform var(--dur-slow) var(--ease-enter)}
+/* 详情弹窗与录入弹窗共用同一套进入/退出方向（base 走 exit，open 走 enter + 弹簧落位） */
+.modal-mask#detailModal .modal{transition:transform var(--dur-base) var(--ease-exit),opacity var(--dur-base) var(--ease-exit)}
+.modal-mask#detailModal.open .modal{transform:none;opacity:1;transition:transform var(--dur-spring-snappy) var(--spring-snappy),opacity var(--dur-fast) var(--ease-enter)}
+.modal-mask#detailModal.open{display:flex;opacity:1;transition:opacity var(--dur-fast) var(--ease-enter)}

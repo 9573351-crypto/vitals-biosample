@@ -390,7 +390,13 @@ function renderLibrary(){
 
   box.querySelectorAll('.sample-row').forEach(row => {
     const id = row.dataset.id;
-    row.addEventListener('click', (e)=>{if(!e.target.closest('button'))openDetail(id);});
+    row.addEventListener('click', (e)=>{
+      if(e.target.closest('button')) return;
+      // 记住这张卡在屏幕上的位置：弹窗从它长出来，而不是凭空出现（方案 A 的 carry）
+      const r = row.getBoundingClientRect();
+      window.__sampleCardFrom = { left:r.left, top:r.top, width:r.width, height:r.height };
+      openDetail(id);
+    });
     // 双击样本行弹出样本详情窗口（含二维码与打印标签），避免单击误触
     const mini = row.querySelector('.barcode-mini');
     // 双击打开样本详情：双击必然选中文本，不能再用"文本选中"判断来拦截（否则永远打不开）
@@ -523,6 +529,7 @@ function openModal(id){
   editingId = id || null;
   $('#modalTitle').textContent = id ? '编辑样本' : '录入样本';
   $('#sampleModal').classList.add('open');
+  growPanelFromCard($('#sampleModal .modal'));
   setDefaultTime();
   if(id){
     const x = state.s.samples[id];
@@ -702,8 +709,16 @@ $('#modalSave').addEventListener('click', ()=>{
   refreshStats();
 });
 function shakeField(el){
-  $(el).style.borderColor = 'var(--red)';
-  setTimeout(()=> $(el).style.borderColor = 'var(--border)', 1200);
+  // 用 class 表达"字段有问题"：不用 setTimeout 写 style（interrupt 腿）；
+  // 抖动由 CSS animation 走 transform，且错误同时有文字提示，不单靠颜色/动效传达。
+  const node = $(el);
+  if(!node) return;
+  node.classList.remove('field-invalid');
+  void node.offsetWidth;   // 强制一次回流，让同一 animation 能重播
+  node.classList.add('field-invalid');
+  // 抖动播完就撤 class：用 animationend 而不是 setTimeout（interrupt 腿）。
+  // 颜色由 .field-invalid 的 border-color 承担，不靠计时器写 style。
+  node.addEventListener('animationend', () => node.classList.remove('field-invalid'), { once:true });
 }
 /* 只有用户真的换过照片才写 photo；未换图时不发送该字段，原生会保留已外置的照片文件。 */
 function applyModalPhoto(x){
@@ -769,6 +784,21 @@ window.markLabelPrinted = function(id){
   return ok;
 };
 
+/* 方案 A 的共享元素辅助：把面板从被点击样本卡的矩形长到最终位置。
+   - 只用 WAAPI 写 transform，动画期间关掉该元素自身的 CSS transition，避免同属性双写；
+   - 用 Animation.finished 交还 CSS，不用 setTimeout 写样式（interrupt 腿）；
+   - reduced-motion 下 MO.reduced() 为真，直接走 CSS 规则（时长 1ms、位移 0），不做位移动画。 */
+function growPanelFromCard(panel){
+  if(!panel || !window.MO || typeof MO.shared !== 'function' || MO.reduced()) return;
+  const from = window.__sampleCardFrom;
+  if(!from || !panel.getBoundingClientRect) return;
+  panel.style.transition = 'none';
+  const anim = MO.shared(panel, from, { dur: MO.tokens.dur.slow });
+  const restore = () => { panel.style.transition = ''; window.__sampleCardFrom = null; };
+  if(anim && anim.finished) anim.finished.then(restore, restore);
+  else restore();
+}
+
 /* ==================== 详情弹窗 ==================== */
 let detailId = null;
 function openDetail(id){
@@ -799,7 +829,9 @@ function openDetail(id){
     printWarn.title = fresh.detail;
   }
   renderQR($('#diQR'), sampleQRText(x));
-  $('#detailModal').classList.add('open');
+  document.getElementById('detailModal').classList.add('open');
+  // 方案 A 的关键一步：详情面板从被点击的样本卡长出来（carry）
+  growPanelFromCard($('#detailModal .modal'));
 }
 $('#closeDetail').addEventListener('click', ()=> $('#detailModal').classList.remove('open'));
 $('#detailModal').addEventListener('click', e=>{ if(e.target===e.currentTarget) $('#detailModal').classList.remove('open'); });

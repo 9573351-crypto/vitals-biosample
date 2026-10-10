@@ -1,0 +1,1362 @@
+{
+  "target": "http://127.0.0.1:8899/index.html",
+  "url": "http://127.0.0.1:8899/index.html",
+  "mobile": false,
+  "generatedAt": "2026-10-10T00:33:32.463Z",
+  "title": "Vitals · 生息 — 生物样本动态管理库",
+  "viewport": {
+    "w": 1440,
+    "h": 900,
+    "dpr": 1
+  },
+  "counts": {
+    "elements": 509,
+    "sheets": 2,
+    "cssReadable": true,
+    "live": 0,
+    "rules": 30
+  },
+  "legs": [
+    {
+      "leg": "tokens",
+      "state": "FAIL",
+      "detail": "CV 0.21 < 0.25（所有时长挤在同一档） — motion durations 117 条来自live computed · distinct 7 [120, 180, 200, 250, 300, 320, 350]ms · CV 0.21 · 档位 3 [fast,base,slow]",
+      "data": {
+        "durs": [
+          350,
+          350,
+          180,
+          180,
+          200,
+          180,
+          120,
+          180,
+          120,
+          250,
+          300,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          200,
+          200,
+          180,
+          180,
+          180,
+          180,
+          200,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          250,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          200,
+          200,
+          200,
+          200,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          180,
+          200,
+          200,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          200,
+          320
+        ],
+        "values": [
+          120,
+          180,
+          200,
+          250,
+          300,
+          320,
+          350
+        ],
+        "cv": 0.209,
+        "buckets": [
+          "fast",
+          "base",
+          "slow"
+        ],
+        "allDistinct": 9,
+        "inconsistent": [],
+        "source": "live computed",
+        "liveDurs": [
+          350,
+          350,
+          180,
+          180,
+          200,
+          180,
+          120,
+          180,
+          120,
+          250,
+          300,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          200,
+          200,
+          180,
+          180,
+          180,
+          180,
+          200,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          250,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          200,
+          200,
+          200,
+          200,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          320,
+          180,
+          180,
+          200,
+          200,
+          200,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          200,
+          320
+        ]
+      }
+    },
+    {
+      "leg": "curves",
+      "state": "PASS",
+      "detail": "t80 p50 0.50 [9 snap / 108 standard / 0 soft] · 进入 1 条(t80 0.307) / 退出 0 条(t80 —) · 曲线 3 种，最常见 ease 占 travel 87% · 弹簧 0 条",
+      "data": {
+        "fails": [],
+        "distribution": {
+          "snap": 9,
+          "standard": 108,
+          "soft": 0
+        },
+        "curves": {
+          "cubic-bezier(0.2, 0.7, 0.2, 1)": 9,
+          "ease": 108,
+          "cubic-bezier(0.2, 0.9, 0.2, 1)": 7
+        },
+        "springs": 0,
+        "linear": 0,
+        "enter": 1,
+        "exit": 0
+      }
+    },
+    {
+      "leg": "compositor",
+      "state": "FAIL",
+      "detail": "22 条非 compositor 属性：.device-online-card → box-shadow; .search-box → box-shadow; .storage-slot.processing → filter; .storage-slot.processing → box-shadow; div#deviceOnlineCard → box-shadow; button#libraryListTab → box-shadow …(+16)",
+      "data": {
+        "violations": [
+          {
+            "selector": ".device-online-card",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": ".search-box",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": ".storage-slot.processing",
+            "prop": "filter",
+            "via": "@keyframes storagePulse",
+            "source": "rule"
+          },
+          {
+            "selector": ".storage-slot.processing",
+            "prop": "box-shadow",
+            "via": "@keyframes storagePulse",
+            "source": "rule"
+          },
+          {
+            "selector": "div#deviceOnlineCard",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "button#libraryListTab",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "button#libraryInventoryTab",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "div#libraryListPane > div.lib-head:nth-of-type(1) > div.search-box.in:nth-of-type(1)",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#recordFrom",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#recordTo",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#setHi",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#setLo",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "i#updateBar",
+            "prop": "width",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#fName",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#fCode",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#fTime",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#fTemp",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#fNote",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "textarea#importFilter",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#labelWidth",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#labelHeight",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          },
+          {
+            "selector": "input#labelGap",
+            "prop": "box-shadow",
+            "via": "CSS 规则",
+            "source": "rule"
+          }
+        ],
+        "okDeclarations": 57,
+        "unknown": [
+          {
+            "selector": ".btn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": ".mini-btn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": ".seg-btn, .btn, .nav-item, .icon-btn, .text-btn, .sample-row, .rack-cell",
+            "prop": "(空)",
+            "via": "transition:all"
+          },
+          {
+            "selector": "*",
+            "prop": "(空)",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#exportBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#importBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#resetBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#updateBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#serialBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "section#view-dashboard > div.grid-2:nth-of-type(2) > div.panel.glass:nth-of-type(2) > div.panel-head:nth-of-type(1) > button.text-btn.in",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#clearSearch",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#addSampleBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#clearTypeFilter",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "div#libraryInventoryPane > div.device-page-intro.glass:nth-of-type(1) > button.btn.ghost",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#connectBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#disconnectBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#scannerConnect",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#scannerDisconnect",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#devicePrinterConnect",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#tempLogClear",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#simStartBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#recordRefresh",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#recordMore",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#backupChoose",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#backupNow",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#backupDisable",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#updateCheckBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#updateInstallBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#updatePageBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#modalCancel",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#modalSave",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#detailEdit",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#printBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#importFilterBtn",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#importCancel",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#importConfirm",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#confirmNo",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#confirmYes",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#scannerCancel",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#usbPrintClose",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#usbPrinterConnect",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#systemPrint",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "button#usbPrintSend",
+            "prop": "all",
+            "via": "transition:all"
+          },
+          {
+            "selector": "section#view-dashboard > div.grid-2:nth-of-type(2) > div.panel.glass:nth-of-type(2) > div.panel-head:nth-of-type(1) > button.text-btn",
+            "prop": "all",
+            "via": "transition:all"
+          }
+        ]
+      }
+    },
+    {
+      "leg": "reduced",
+      "state": "PASS",
+      "detail": "reduce 分支 有（css ✓ / js ✗） · 模拟 reduce 后 live 位移/缩放 0 条 · >100ms 0 条 · 残留颜色/透明度反馈 51 条（当时在跑 0 条，reduce 下 1ms 基本已结束）· 原始位移动画 117 条",
+      "data": {
+        "long": [],
+        "longInd": [],
+        "hasBranch": true
+      }
+    },
+    {
+      "leg": "budget",
+      "state": "PASS",
+      "detail": "179 帧 · p50 16.6ms · p95 18.2ms · 最长 18.8ms · >50ms 0 帧",
+      "data": {
+        "p50": 16.600000000093132,
+        "p95": 18.199999999953434,
+        "max": 18.800000000046566,
+        "long": 0,
+        "n": 179
+      }
+    },
+    {
+      "leg": "stillness",
+      "state": "PASS",
+      "detail": "idle 2.5s：489 个元素里 0 个仍在动 · infinite 位移/缩放 0 条非豁免 条",
+      "data": {
+        "moved": [],
+        "transient": 0,
+        "inf": [],
+        "elements": 489,
+        "vw": 1440,
+        "vh": 900
+      }
+    },
+    {
+      "leg": "interrupt",
+      "state": "WARN",
+      "detail": "app.js?v=26 → .style. — 计时器里写样式 1 处 · CSS transition 与 WAAPI 同属性双写 0 处 · 脚本里 .animate( 0 个 · 扫描脚本 11 个",
+      "data": {
+        "hits": [
+          {
+            "kind": "timer-write",
+            "where": "app.js?v=26",
+            "what": ".style.",
+            "snippet": "()=> $(el).style.borderColor = 'var(--border)', 1200"
+          }
+        ],
+        "dual": []
+      }
+    }
+  ],
+  "fails": 2,
+  "warns": 1,
+  "errors": 0,
+  "ref": null,
+  "shots": null,
+  "raw": {
+    "tokens": {
+      "durs": [
+        350,
+        350,
+        180,
+        180,
+        200,
+        180,
+        120,
+        180,
+        120,
+        250,
+        300,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        200,
+        200,
+        180,
+        180,
+        180,
+        180,
+        200,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        250,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        200,
+        200,
+        200,
+        200,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        180,
+        200,
+        200,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        200,
+        320
+      ],
+      "values": [
+        120,
+        180,
+        200,
+        250,
+        300,
+        320,
+        350
+      ],
+      "cv": 0.209,
+      "buckets": [
+        "fast",
+        "base",
+        "slow"
+      ],
+      "allDistinct": 9,
+      "inconsistent": [],
+      "source": "live computed",
+      "liveDurs": [
+        350,
+        350,
+        180,
+        180,
+        200,
+        180,
+        120,
+        180,
+        120,
+        250,
+        300,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        200,
+        200,
+        180,
+        180,
+        180,
+        180,
+        200,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        250,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        200,
+        200,
+        200,
+        200,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        320,
+        180,
+        180,
+        200,
+        200,
+        200,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        180,
+        200,
+        320
+      ]
+    },
+    "curves": {
+      "fails": [],
+      "distribution": {
+        "snap": 9,
+        "standard": 108,
+        "soft": 0
+      },
+      "curves": {
+        "cubic-bezier(0.2, 0.7, 0.2, 1)": 9,
+        "ease": 108,
+        "cubic-bezier(0.2, 0.9, 0.2, 1)": 7
+      },
+      "springs": 0,
+      "linear": 0,
+      "enter": 1,
+      "exit": 0
+    },
+    "compositor": {
+      "violations": [
+        {
+          "selector": ".device-online-card",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": ".search-box",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": ".storage-slot.processing",
+          "prop": "filter",
+          "via": "@keyframes storagePulse",
+          "source": "rule"
+        },
+        {
+          "selector": ".storage-slot.processing",
+          "prop": "box-shadow",
+          "via": "@keyframes storagePulse",
+          "source": "rule"
+        },
+        {
+          "selector": "div#deviceOnlineCard",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "button#libraryListTab",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "button#libraryInventoryTab",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "div#libraryListPane > div.lib-head:nth-of-type(1) > div.search-box.in:nth-of-type(1)",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#recordFrom",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#recordTo",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#setHi",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#setLo",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "i#updateBar",
+          "prop": "width",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#fName",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#fCode",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#fTime",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#fTemp",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#fNote",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "textarea#importFilter",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#labelWidth",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#labelHeight",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        },
+        {
+          "selector": "input#labelGap",
+          "prop": "box-shadow",
+          "via": "CSS 规则",
+          "source": "rule"
+        }
+      ],
+      "okDeclarations": 57,
+      "unknown": [
+        {
+          "selector": ".btn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": ".mini-btn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": ".seg-btn, .btn, .nav-item, .icon-btn, .text-btn, .sample-row, .rack-cell",
+          "prop": "(空)",
+          "via": "transition:all"
+        },
+        {
+          "selector": "*",
+          "prop": "(空)",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#exportBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#importBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#resetBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#updateBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#serialBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "section#view-dashboard > div.grid-2:nth-of-type(2) > div.panel.glass:nth-of-type(2) > div.panel-head:nth-of-type(1) > button.text-btn.in",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#clearSearch",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#addSampleBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#clearTypeFilter",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "div#libraryInventoryPane > div.device-page-intro.glass:nth-of-type(1) > button.btn.ghost",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#connectBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#disconnectBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#scannerConnect",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#scannerDisconnect",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#devicePrinterConnect",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#tempLogClear",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#simStartBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#recordRefresh",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#recordMore",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#backupChoose",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#backupNow",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#backupDisable",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#updateCheckBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#updateInstallBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#updatePageBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#modalCancel",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#modalSave",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#detailEdit",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#printBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#importFilterBtn",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#importCancel",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#importConfirm",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#confirmNo",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#confirmYes",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#scannerCancel",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#usbPrintClose",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#usbPrinterConnect",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#systemPrint",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "button#usbPrintSend",
+          "prop": "all",
+          "via": "transition:all"
+        },
+        {
+          "selector": "section#view-dashboard > div.grid-2:nth-of-type(2) > div.panel.glass:nth-of-type(2) > div.panel-head:nth-of-type(1) > button.text-btn",
+          "prop": "all",
+          "via": "transition:all"
+        }
+      ]
+    }
+  }
+}

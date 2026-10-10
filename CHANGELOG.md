@@ -26,6 +26,32 @@
 
 窄屏（CSS 393px，等价手机档）下 chip 行横向滚动、触控高度仍为 44px，同一套 17 条断言全部通过。
 
+### 动效（onemotion 规范落地）
+
+以「**一张样本卡贯穿它的一切状态**」为中心思想重做交互动效，并建立可执行的 token 与验收机制：
+
+- 新增 `tokens.css`（时长 80/140/220/340/500ms、5 条按 t80 取向的曲线、32 步 `linear()` 弹簧、幅度/错峰）与 `motion.js`（`window.MO`）；
+- **点开样本卡时，详情面板从该卡片的矩形长出来**（共享元素 + 弹簧落位），关闭时回落 —— 状态之间不再是硬切；
+- 按压反馈跟手（80ms，`pointerdown` 同帧可见）；表单字段无效改为 `transform` 抖动 + `animationend` 收尾；
+- 修掉 22 处非合成属性动画（`box-shadow`/`filter`/无限 `box-shadow` 关键帧），只动 `transform`/`opacity`；
+- 删掉一条把 7 类元素压成同一时长的 blanket `transition-duration`（"节拍器"根因）；
+- `prefers-reduced-motion`：时长压到 **1ms**（不是 0，0 会让 `transitionend` 不触发），位移归零、保留颜色/透明度反馈。
+
+验收（`node <onemotion>/scripts/audit_motion.mjs`，7 条腿）：
+
+| 腿 | 改造前 | 改造后 |
+| --- | --- | --- |
+| `tokens` | ❌ CV **0.21**，117 条挤成 7 档 | ✅ 67 条 / 4 档 [80,140,220,340] / CV **0.65** |
+| `curves` | ✅ 87% 同一条 ease | ✅ standard 78% + soft + snap |
+| `compositor` | ❌ **22 条**非合成属性 | ✅ 0（仅 transform/opacity） |
+| `reduced` | ✅（js ✗） | ✅（css ✓ / js ✓） |
+| `budget` | ✅ p95 18.2ms | ✅ p95 17.9ms / >50ms 0 帧 |
+| `stillness` | ✅ | ✅ idle 0 个元素在动 |
+| `interrupt` | ⚠️ 计时器写样式 | ✅ 0 处 |
+
+设备端（Android 14 / API 34 平板档）另跑 `.local-ci/verify-motion-continuity.mjs`：**10/10 通过**
+（carry 起点矩形 == 卡片矩形、WAAPI 落位后交还 CSS、时长仅取 token 档位、同屏跨度 ≥4×）。
+规范与状态表见 `vitals-android/docs/MOTION-SPEC.md`。
 ## v1.20.1
 
 ### 修复

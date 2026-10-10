@@ -1,11 +1,10 @@
 {
   "checks": [
-    { "type": "target", "name": "category chip 全部 (44pt)", "w": 90, "h": 44 },
-    { "type": "target", "name": "category chip 类别 (44pt)", "w": 72, "h": 44 },
-    { "type": "target", "name": "清除筛选按钮 (44pt)", "w": 52, "h": 44 },
-    { "type": "contrast", "name": "选中 chip 白字/渐变起点 #0A69FF", "fg": "#FFFFFF", "bg": "#0A69FF" },
-    { "type": "contrast", "name": "选中 chip 白字/渐变终点 #0A57BF", "fg": "#FFFFFF", "bg": "#0A57BF" },
-    { "type": "contrast", "name": "未选中 chip 文字 text-2/轨道", "fg": "#6E6E73", "bg": "#F2F2F4" },
-    { "type": "contrast", "name": "结果计数 text-2/页面底", "fg": "#6E6E73", "bg": "#F5F5F7" }
+    { "type": "target", "name": "category chip (44pt)", "w": 90, "h": 44 },
+    { "type": "target", "name": "clear filter button (44pt)", "w": 52, "h": 44 },
+    { "type": "contrast", "name": "selected chip white on #0A69FF", "fg": "#FFFFFF", "bg": "#0A69FF" },
+    { "type": "contrast", "name": "selected chip white on #0A57BF", "fg": "#FFFFFF", "bg": "#0A57BF" },
+    { "type": "contrast", "name": "unselected chip text-2 on track", "fg": "#6E6E73", "bg": "#F2F2F4" },
+    { "type": "contrast", "name": "result count text-2 on page", "fg": "#6E6E73", "bg": "#F5F5F7" }
   ]
 }
