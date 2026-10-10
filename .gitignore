@@ -27,6 +27,7 @@ captures/
 .local-ci/debug-*.mjs
 .local-ci/instrument-*.txt
 .local-ci/device-test.apk
+.local-ci/commit-*.txt
 *.zip
 *.7z
 *.rar
