@@ -792,9 +792,31 @@ function growPanelFromCard(panel){
   if(!panel || !window.MO || typeof MO.shared !== 'function' || MO.reduced()) return;
   const from = window.__sampleCardFrom;
   if(!from || !panel.getBoundingClientRect) return;
+  // 变形强度大幅减弱：原来的 full FLIP 是「卡片矩形 → 面板矩形」全额插值，
+  // 卡片与面板宽度差很大时会被放大成 1.7× 的夸张拉伸。这里保留连续性的"来处"，
+  // 但把位移上限压到 40px、缩放限制在 0.96–1.04（与 tokens 的 --scale-in/--scale-pop 同界），
+  // 同时叠一点淡入，让弹窗整体是"轻轻浮起"而不是"炸开"。
+  const rect = panel.getBoundingClientRect();
+  const MAX_SHIFT = 40;                 // px，位移上限
+  const MIN_SCALE = 0.96;
+  const MAX_SCALE = 1.04;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const dw = rect.width ? (from.width - rect.width) : 0;
+  const dh = rect.height ? (from.height - rect.height) : 0;
+  const dx = clamp(from.left - rect.left, -MAX_SHIFT, MAX_SHIFT);
+  const dy = clamp(from.top - rect.top, -MAX_SHIFT, MAX_SHIFT);
+  const sx = clamp(rect.width ? from.width / rect.width : 1, MIN_SCALE, MAX_SCALE);
+  const sy = clamp(rect.height ? from.height / rect.height : 1, MIN_SCALE, MAX_SCALE);
   panel.style.transition = 'none';
-  const anim = MO.shared(panel, from, { dur: MO.tokens.dur.slow });
-  const restore = () => { panel.style.transition = ''; window.__sampleCardFrom = null; };
+  panel.style.transformOrigin = 'top left';
+  const anim = MO.animate(panel,
+    [
+      { transform: 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(' + sx + ',' + sy + ')', opacity: 0.6 },
+      { transform: 'translate3d(0,0,0) scale(1,1)', opacity: 1 }
+    ],
+    { dur: MO.tokens.dur.base, ease: 'enter' }
+  );
+  const restore = () => { panel.style.transition = ''; panel.style.transformOrigin = ''; window.__sampleCardFrom = null; };
   if(anim && anim.finished) anim.finished.then(restore, restore);
   else restore();
 }
@@ -1012,7 +1034,7 @@ function saveTemperatureLimit(key, input){
 }
 $('#setHi').addEventListener('change', e=>saveTemperatureLimit('hi',e.target));
 $('#setLo').addEventListener('change', e=>saveTemperatureLimit('lo',e.target));
-$('#exportBtn').addEventListener('click', exportData);
+$('#exportBtn').addEventListener('click', openExportModal);
 $('#importBtn').addEventListener('click', ()=> AndroidHost.importJson());
 $('#importFile').addEventListener('change', importData);
 $('#resetBtn').addEventListener('click', ()=>{
@@ -1048,51 +1070,149 @@ function saveTextFile(name, content, mime, okMessage){
   setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
   toast(okMessage||'已导出');
 }
-/* 侧边栏「导出」：完整备份（保留含照片的旧语义） */
-function exportData(){
-  if(!saveAll())return;
-  let content;try{content=Store.exportBackupText(true);}catch(e){toast('导出失败：'+e.message);return;}
-  saveTextFile('vitals_backup_'+Date.now()+'.json', content, 'application/json', '数据已导出备份');
-}
+/* ==================== 导出弹窗（侧栏「导出」）==================== 
+   两轴选择：导出内容 × 文件类型。只暴露原生真实支持的能力：
+   - JSON：完整备份（Store.exportBackupText，可选含照片）
+   - CSV ：samples / records / env（Store.exportCsvText，支持日期与类型筛选）
+   旧版原生只支持 env 的 CSV、或不支持 CSV 时，按钮会置灰并说明原因。 */
+const EXPORT_SCOPES = [
+  { id:'backup',  label:'完整备份',      desc:'样本、照片、记录与偏好设置，可在其它设备导入恢复', formats:['json'] },
+  { id:'samples', label:'样本清单',      desc:'编号、类别、位置、状态、采集时间与温度',           formats:['csv'] },
+  { id:'records', label:'操作记录',      desc:'出入库等操作明细，可按日期与类型筛选',             formats:['csv'] },
+  { id:'env',     label:'温度历史',      desc:'每个样本一个温度点一行，便于做曲线分析',           formats:['csv'] }
+];
+let exportScope = 'backup';
+let exportFormat = 'json';
+let exportCounts = { samples:0, records:0, env:0 };
 
-/* ==================== 设置：数据导出卡片 ==================== */
-function installExportCard(){
-  const view = $('#view-settings');
-  if(!view || $('#exportCard')) return;
-  const hasBackup = Store.canExportBackup(), hasCsv = Store.canExportCsv();
-  const card = document.createElement('section');
-  card.className = 'panel glass'; card.id = 'exportCard';
-  card.innerHTML = '<div class="panel-head"><h3>数据导出</h3><span class="pill" id="exportPill">'+
-      (hasBackup ? (hasCsv?'JSON / CSV':'JSON') : (hasCsv?'JSON（兼容）/ CSV':'JSON（兼容）'))+'</span></div>'+
-    '<p class="muted">备份自带 schema 版本与校验和，可在其他设备导入恢复。默认不含照片，体积更小。</p>'+
-    '<label class="setting-row export-toggle"><span>备份包含样本照片</span><input type="checkbox" id="exportPhotos"></label>'+
-    '<div class="set-actions">'+
-      '<button class="btn primary" id="exportBackupBtn">导出完整备份（JSON）</button>'+
-      '<button class="btn ghost" id="exportRecordsCsv">导出记录 CSV</button>'+
-      '<button class="btn ghost" id="exportSamplesCsv">导出样本 CSV</button>'+
-    '</div>'+
-    '<p class="muted">CSV 导出范围可留空（全部）；结束日期含当天。</p>'+
-    '<div class="export-range">'+
-      '<label class="field"><span>起始日期</span><input class="input" type="date" id="csvFrom"></label>'+
-      '<label class="field"><span>结束日期</span><input class="input" type="date" id="csvTo"></label>'+
-    '</div>';
-  view.appendChild(card);
-  $('#exportBackupBtn').onclick = exportBackupWithPhotos;
-  if(hasCsv){
-    $('#exportRecordsCsv').onclick = ()=>exportCsvFile('records');
-    $('#exportSamplesCsv').onclick = ()=>exportCsvFile('samples');
-  } else {
-    const disable = btn => { btn.disabled = true; btn.title = '当前版本原生不支持 CSV 导出'; };
-    disable($('#exportRecordsCsv')); disable($('#exportSamplesCsv'));
+function exportScopeDef(id){ return EXPORT_SCOPES.find(s => s.id === id) || EXPORT_SCOPES[0]; }
+function exportScopeCount(id){
+  if(id === 'env') return exportCounts.env;
+  if(id === 'records') return exportCounts.records;
+  return exportCounts.samples; // 完整备份与样本清单都覆盖全部样本
+}
+function exportBytes(){
+  return { samples: Object.keys(state.s.samples||{}).length, records: (state.rec||[]).length };
+}
+function renderExportModal(){
+  const mount = $('#exportScope');
+  if(!mount) return;
+  const def = exportScopeDef(exportScope);
+  if(def.formats.indexOf(exportFormat) < 0) exportFormat = def.formats[0];
+  const canBackup = Store.canExportBackup(), canCsv = Store.canExportCsv();
+  const disabledReason = scope => {
+    if(scope.formats.indexOf('json') >= 0 && !canBackup) return '当前版本原生不支持导出备份';
+    if(scope.formats.indexOf('csv') >= 0 && !canCsv) return '当前版本原生不支持 CSV 导出';
+    return '';
+  };
+  mount.innerHTML = EXPORT_SCOPES.map(scope => {
+    const on = scope.id === exportScope;
+    const bad = disabledReason(scope);
+    return '<button type="button" class="export-scope-item" role="radio" data-scope="' + scope.id + '"'
+      + ' aria-checked="' + (on ? 'true' : 'false') + '"' + (bad ? ' disabled title="' + esc(bad) + '"' : '') + '>'
+      + '<span class="esi-radio" aria-hidden="true"></span>'
+      + '<span class="esi-text"><b>' + esc(scope.label) + '</b><small>' + esc(scope.desc) + '</small></span>'
+      + '<span class="esi-count">' + exportScopeCount(scope.id) + ' 条</span></button>';
+  }).join('');
+  mount.querySelectorAll('.export-scope-item').forEach(btn => {
+    btn.addEventListener('click', () => { if(!btn.disabled) setExportScope(btn.dataset.scope); });
+  });
+  // 只有「单一 CSV 类型」的三项才隐藏类型选择；完整备份显示两个类型但 CSV 置灰，
+  // 让用户看到「为什么不能选 CSV」，而不是面对一个消失的选项。
+  const onlyCsv = def.id !== 'backup';
+  const fmtWrap = $('#exportFormatWrap');
+  if(fmtWrap) fmtWrap.hidden = onlyCsv;
+  $('#exportFormat').querySelectorAll('[data-format]').forEach(btn => {
+    const on = btn.dataset.format === exportFormat;
+    btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    // 当前导出内容本身不支持的格式也要置灰（例：完整备份只能是 JSON），
+    // 这样用户看到的是「CSV 为什么不能选」而不是一个凭空消失的选项。
+    const inScope = def.formats.indexOf(btn.dataset.format) >= 0;
+    const supported = inScope && (btn.dataset.format === 'json' ? canBackup : canCsv);
+    btn.disabled = !supported;
+    btn.setAttribute('aria-disabled', supported ? 'false' : 'true');
+    btn.title = supported ? '' : (inScope
+      ? (btn.dataset.format === 'json' ? '当前版本原生不支持导出备份' : '当前版本原生不支持 CSV 导出')
+      : (btn.dataset.format === 'csv' ? '完整备份包含照片与设置，只能用 JSON' : '该项只能用 CSV'));
+  });
+  const photosRow = $('#exportPhotosRow');
+  if(photosRow) photosRow.hidden = exportScope !== 'backup';
+  const range = $('#exportRange');
+  if(range) range.hidden = !(exportScope === 'records' || exportScope === 'env');
+  const outcome = $('#exportOutcome');
+  if(outcome){
+    const what = exportScope === 'backup'
+      ? (exportFormat === 'json' ? '完整备份（JSON，可含照片）' : '完整备份')
+      : def.label + '（CSV）';
+    const note = exportScope === 'backup'
+      ? ' 备份自带 schema 版本与校验和，导入时会先校验。'
+      : ' CSV 用 UTF-8 + BOM，Excel 双击即开；不含照片。';
+    outcome.textContent = '将导出：' + what + '，共 ' + exportScopeCount(exportScope) + ' 条。' + note;
+  }
+  const confirm = $('#exportConfirm');
+  if(confirm) confirm.disabled = !!disabledReason(def);
+}
+function setExportScope(id){ exportScope = id; renderExportModal(); }
+function setExportFormat(fmt){ exportFormat = fmt; renderExportModal(); }
+function openExportModal(){
+  if(!saveAll()) return;
+  const bytes = exportBytes();
+  exportCounts = { samples: bytes.samples, records: bytes.records, env: bytes.samples };
+  // 记录页的日期/类型筛选是同一批数据的视图，导出沿用它们的当前取值
+  const rf = $('#recordFrom'), rt = $('#recordTo'), rfFrom = $('#exportFrom'), rtTo = $('#exportTo');
+  if(rfFrom && rf) rfFrom.value = rf.value || '';
+  if(rtTo && rt) rtTo.value = rt.value || '';
+  const m = $('#exportModal');
+  if(!m){ toast('导出面板不可用'); return; }
+  m.classList.add('open');
+  renderExportModal();
+}
+function closeExportModal(){ const m = $('#exportModal'); if(m) m.classList.remove('open'); }
+function exportRangeOptions(){
+  const options = {};
+  const from = $('#exportFrom') ? $('#exportFrom').value : '';
+  const to = $('#exportTo') ? $('#exportTo').value : '';
+  if(from) options.fromIso = from + 'T00:00';
+  if(to) options.toIso = to + 'T23:59';
+  const typeValue = recordTypeFilterValue();
+  if(typeValue && typeValue.indexOf('code:') === 0) options.typeCode = typeValue.slice(5);
+  return options;
+}
+function runExport(){
+  const def = exportScopeDef(exportScope);
+  try{
+    if(exportScope === 'backup'){
+      const includePhotos = !!($('#exportPhotos') && $('#exportPhotos').checked);
+      const content = Store.exportBackupText(includePhotos);
+      saveTextFile('vitals_backup_' + Date.now() + '.json', content, 'application/json',
+        includePhotos ? '备份已导出（含照片）' : '备份已导出（不含照片）');
+    } else {
+      if(!Store.canExportCsv()){ toast('当前版本不支持 CSV 导出'); return; }
+      const csv = Store.exportCsvText(exportScope, exportRangeOptions());
+      if(!csv){ toast('导出失败：内容为空'); return; }
+      const label = def.label;
+      saveTextFile('vitals_' + exportScope + '_' + Date.now() + '.csv', csv, 'text/csv', label + ' CSV 已导出');
+    }
+    closeExportModal();
+  }catch(e){
+    toast('导出失败：' + (e && e.message ? e.message : '未知错误'));
   }
 }
-function exportBackupWithPhotos(){
-  if(!saveAll())return;
-  const includePhotos = !!($('#exportPhotos') && $('#exportPhotos').checked);
-  let content;try{content=Store.exportBackupText(includePhotos);}catch(e){toast('导出失败：'+e.message);return;}
-  saveTextFile('vitals_backup_'+Date.now()+'.json', content, 'application/json',
-    includePhotos?'备份已导出（含照片）':'备份已导出（不含照片）');
+function bindExportModal(){
+  const m = $('#exportModal');
+  if(!m) return;
+  $('#closeExport').addEventListener('click', closeExportModal);
+  $('#exportCancel').addEventListener('click', closeExportModal);
+  m.addEventListener('click', e => { if(e.target === m) closeExportModal(); });
+  $('#exportConfirm').addEventListener('click', runExport);
+  $('#exportFormat').querySelectorAll('[data-format]').forEach(btn => {
+    btn.addEventListener('click', () => { if(!btn.disabled) setExportFormat(btn.dataset.format); });
+  });
 }
+
+/* ==================== 设置：数据导出卡片（已移除）====================
+   导出功能已统一到侧栏「导出」弹窗（内容 × 类型两轴），设置页不再重复显示。
+   原 installExportCard 与 exportBackupWithPhotos 已删除；脚本里 exportCsvFile 仅保留被记录页日期筛选复用的部分。 */
 function exportCsvFile(kind){
   if(!Store.canExportCsv()){ toast('当前版本不支持 CSV 导出'); return; }
   const options = {};
@@ -1715,7 +1835,7 @@ function init(){
   addSampleBtnInit();
   bindRecordFilters();
   bindImportUI();
-  installExportCard();
+  bindExportModal();
   recomputeStats(); refreshStats();
   renderLibrary();
   renderRecords();
@@ -1731,7 +1851,8 @@ function init(){
 
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape'){
-    if($('#importModal') && $('#importModal').classList.contains('open')) closeImportModal();
+    if($('#exportModal') && $('#exportModal').classList.contains('open')) closeExportModal();
+    else if($('#importModal') && $('#importModal').classList.contains('open')) closeImportModal();
     else if($('#detailModal').classList.contains('open')) $('#detailModal').classList.remove('open');
     else if($('#sampleModal').classList.contains('open')) $('#sampleModal').classList.remove('open');
   }

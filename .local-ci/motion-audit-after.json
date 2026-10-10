@@ -2,7 +2,7 @@
   "target": "http://127.0.0.1:8899/index.html",
   "url": "http://127.0.0.1:8899/index.html",
   "mobile": false,
-  "generatedAt": "2026-10-10T00:54:48.846Z",
+  "generatedAt": "2026-10-10T01:24:57.125Z",
   "title": "Vitals · 生息 — 生物样本动态管理库",
   "viewport": {
     "w": 1440,
@@ -10,7 +10,7 @@
     "dpr": 1
   },
   "counts": {
-    "elements": 511,
+    "elements": 539,
     "sheets": 3,
     "cssReadable": true,
     "live": 0,
@@ -20,7 +20,7 @@
     {
       "leg": "tokens",
       "state": "PASS",
-      "detail": "motion durations 67 条来自live computed · distinct 4 [80, 140, 220, 340]ms · CV 0.65 · 档位 4 [instant,fast,base,slow]",
+      "detail": "motion durations 71 条来自live computed · distinct 4 [80, 140, 220, 340]ms · CV 0.65 · 档位 4 [instant,fast,base,slow]",
       "data": {
         "durs": [
           140,
@@ -77,6 +77,10 @@
           220,
           80,
           80,
+          220,
+          80,
+          80,
+          80,
           80,
           220,
           80,
@@ -97,7 +101,7 @@
           220,
           340
         ],
-        "cv": 0.654,
+        "cv": 0.651,
         "buckets": [
           "instant",
           "fast",
@@ -162,6 +166,10 @@
           220,
           80,
           80,
+          220,
+          80,
+          80,
+          80,
           80,
           220,
           80,
@@ -181,18 +189,18 @@
     {
       "leg": "curves",
       "state": "PASS",
-      "detail": "t80 p50 0.52 [9 snap / 52 standard / 6 soft] · 进入 0 条(t80 —) / 退出 0 条(t80 —) · 曲线 3 种，最常见 cubic-bezier(0.4, 0, 0.2, 1) 占 travel 78% · 弹簧 0 条",
+      "detail": "t80 p50 0.52 [9 snap / 55 standard / 7 soft] · 进入 0 条(t80 —) / 退出 0 条(t80 —) · 曲线 3 种，最常见 cubic-bezier(0.4, 0, 0.2, 1) 占 travel 77% · 弹簧 0 条",
       "data": {
         "fails": [],
         "distribution": {
           "snap": 9,
-          "standard": 52,
-          "soft": 6
+          "standard": 55,
+          "soft": 7
         },
         "curves": {
-          "cubic-bezier(0.4, 0, 0.2, 1)": 52,
+          "cubic-bezier(0.4, 0, 0.2, 1)": 55,
           "cubic-bezier(0.05, 0.7, 0.1, 1)": 9,
-          "cubic-bezier(0.3, 0, 0.8, 0.15)": 6
+          "cubic-bezier(0.3, 0, 0.8, 0.15)": 7
         },
         "springs": 0,
         "linear": 0,
@@ -203,10 +211,10 @@
     {
       "leg": "compositor",
       "state": "PASS",
-      "detail": "只有 transform/opacity（82 条声明） · 1 条 transition-all 无法静态判断，已按 live 实际属性核对",
+      "detail": "只有 transform/opacity（87 条声明） · 1 条 transition-all 无法静态判断，已按 live 实际属性核对",
       "data": {
         "violations": [],
-        "okDeclarations": 82,
+        "okDeclarations": 87,
         "unknown": [
           {
             "selector": "*",
@@ -219,7 +227,7 @@
     {
       "leg": "reduced",
       "state": "PASS",
-      "detail": "reduce 分支 有（css ✓ / js ✓） · 模拟 reduce 后 live 位移/缩放 0 条 · >100ms 0 条 · 残留颜色/透明度反馈 104 条（当时在跑 0 条，reduce 下 1ms 基本已结束）· 原始位移动画 67 条",
+      "detail": "reduce 分支 有（css ✓ / js ✓） · 模拟 reduce 后 live 位移/缩放 0 条 · >100ms 0 条 · 残留颜色/透明度反馈 117 条（当时在跑 0 条，reduce 下 1ms 基本已结束）· 原始位移动画 71 条",
       "data": {
         "long": [],
         "longInd": [],
@@ -229,24 +237,24 @@
     {
       "leg": "budget",
       "state": "PASS",
-      "detail": "180 帧 · p50 16.6ms · p95 17.9ms · 最长 27.0ms · >50ms 0 帧",
+      "detail": "179 帧 · p50 16.7ms · p95 17.7ms · 最长 18.2ms · >50ms 0 帧",
       "data": {
-        "p50": 16.600000000093132,
-        "p95": 17.90000000037253,
-        "max": 27,
+        "p50": 16.700000000186265,
+        "p95": 17.699999999254942,
+        "max": 18.200000000186265,
         "long": 0,
-        "n": 180
+        "n": 179
       }
     },
     {
       "leg": "stillness",
       "state": "PASS",
-      "detail": "idle 2.5s：489 个元素里 0 个仍在动 · infinite 位移/缩放 0 条非豁免 条",
+      "detail": "idle 2.5s：517 个元素里 0 个仍在动 · infinite 位移/缩放 0 条非豁免 条",
       "data": {
         "moved": [],
         "transient": 0,
         "inf": [],
-        "elements": 489,
+        "elements": 517,
         "vw": 1440,
         "vh": 900
       }
@@ -254,7 +262,7 @@
     {
       "leg": "interrupt",
       "state": "PASS",
-      "detail": "计时器里写样式 0 处 · CSS transition 与 WAAPI 同属性双写 0 处 · 脚本里 .animate( 1 个 · 扫描脚本 12 个",
+      "detail": "计时器里写样式 0 处 · CSS transition 与 WAAPI 同属性双写 0 处 · 脚本里 .animate( 2 个 · 扫描脚本 12 个",
       "data": {
         "hits": [],
         "dual": []
@@ -323,6 +331,10 @@
         220,
         80,
         80,
+        220,
+        80,
+        80,
+        80,
         80,
         220,
         80,
@@ -343,7 +355,7 @@
         220,
         340
       ],
-      "cv": 0.654,
+      "cv": 0.651,
       "buckets": [
         "instant",
         "fast",
@@ -408,6 +420,10 @@
         220,
         80,
         80,
+        220,
+        80,
+        80,
+        80,
         80,
         220,
         80,
@@ -427,13 +443,13 @@
       "fails": [],
       "distribution": {
         "snap": 9,
-        "standard": 52,
-        "soft": 6
+        "standard": 55,
+        "soft": 7
       },
       "curves": {
-        "cubic-bezier(0.4, 0, 0.2, 1)": 52,
+        "cubic-bezier(0.4, 0, 0.2, 1)": 55,
         "cubic-bezier(0.05, 0.7, 0.1, 1)": 9,
-        "cubic-bezier(0.3, 0, 0.8, 0.15)": 6
+        "cubic-bezier(0.3, 0, 0.8, 0.15)": 7
       },
       "springs": 0,
       "linear": 0,
@@ -442,7 +458,7 @@
     },
     "compositor": {
       "violations": [],
-      "okDeclarations": 82,
+      "okDeclarations": 87,
       "unknown": [
         {
           "selector": "*",

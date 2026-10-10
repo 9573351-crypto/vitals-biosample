@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vitals · 生息 — 生物样本动态管理库</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
-<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="styles.css?v=27"><link rel="stylesheet" href="android.css">
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="styles.css?v=28"><link rel="stylesheet" href="android.css">
 <script src="vendor/qrcode.min.js" defer></script>
 <script src="vendor/chart.umd.js" defer></script>
 <script src="motion.js" defer></script>
-<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=27" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="backup.js" defer></script><script src="updater.js" defer></script>
+<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=28" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="backup.js" defer></script><script src="updater.js" defer></script>
 </head>
 <body>
 
@@ -357,6 +357,39 @@
   </div>
 </div>
 
+<!-- 导出弹窗（侧栏「导出」打开；替代设置页里重复的「数据导出」卡片） -->
+<div class="modal-mask" id="exportModal">
+  <div class="modal export-modal">
+    <div class="modal-head">
+      <h3>导出数据</h3>
+      <button class="icon-btn close" id="closeExport" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="muted" id="exportHint">选择要导出的内容与文件类型。CSV 用 UTF-8 + BOM，Excel 可直接双击打开。</p>
+      <div class="export-scope" id="exportScope" role="radiogroup" aria-label="导出内容"></div>
+      <div class="export-format" id="exportFormatWrap">
+        <span class="export-format-label" id="exportFormatLabel">文件类型</span>
+        <div class="export-format-pick" id="exportFormat" role="radiogroup" aria-label="文件类型">
+          <button type="button" class="seg-btn" role="radio" data-format="json" aria-checked="false">JSON · 备份</button>
+          <button type="button" class="seg-btn" role="radio" data-format="csv" aria-checked="false">CSV · 表格</button>
+        </div>
+      </div>
+      <div class="export-range" id="exportRange">
+        <label class="field"><span>起始日期</span><input class="input" type="date" id="exportFrom"></label>
+        <label class="field"><span>结束日期</span><input class="input" type="date" id="exportTo"></label>
+      </div>
+      <label class="setting-row export-toggle" id="exportPhotosRow">
+        <span>备份包含样本照片<small>体积更大；CSV 与温度历史不含照片</small></span>
+        <input type="checkbox" id="exportPhotos">
+      </label>
+      <div class="export-outcome" id="exportOutcome" aria-live="polite"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="exportCancel">取消</button>
+      <button class="btn primary" id="exportConfirm">导出</button>
+    </div>
+  </div>
+</div>
 <script>
 // 注入构建版本标记（用于排错缓存）
 window.__VITALS = { version: 'v1.19.0', build: Date.now() };

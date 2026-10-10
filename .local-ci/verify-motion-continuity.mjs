@@ -35,12 +35,13 @@ check('样本库有可点击的样本卡', rows > 0, 'rows=' + rows);
 const result = await ev(`(() => {
   const row = document.querySelector('#sampleList .sample-row');
   const rect = row.getBoundingClientRect();
-  // 记录动画起点：包一层 MO.shared，捕获它收到的 fromRect
-  const original = MO.shared;
+  // 捕获动画关键帧：包一层 MO.animate，拿到"从卡片矩形推导出的"起始 transform 与不透明度。
+  // （变形强度已按要求大幅减弱：位移限幅 40px、缩放限幅 0.96–1.04，不再做全额 FLIP。）
+  const original = MO.animate;
   let captured = null;
-  MO.shared = function(el, fromRect, opts){ captured = { fromRect: {...fromRect}, el: el.className }; return original.apply(this, arguments); };
+  MO.animate = function(el, frames, opts){ captured = { frames: JSON.parse(JSON.stringify(frames)), opts: opts && { dur: opts.dur, ease: opts.ease }, el: el.className }; return original.apply(this, arguments); };
   row.click();
-  MO.shared = original;
+  MO.animate = original;
   const panel = document.querySelector('#detailModal .modal');
   const anims = panel ? panel.getAnimations().map(a => ({ name:a.animationName || '(transition)', state:a.playState })) : [];
   return {
@@ -52,12 +53,20 @@ const result = await ev(`(() => {
   };
 })()`);
 console.log(JSON.stringify(result, null, 2));
-check('点开卡片时面板从该卡片矩形起步（carry 存在）', !!result.captured, '未捕获到 MO.shared 调用');
+check('点开卡片时面板从该卡片推导的位置起步（carry 存在）', !!result.captured, '未捕获到 MO.animate 调用');
 if (result.captured) {
-  const c = result.captured.fromRect, r = result.cardRect;
-  const sameBox = Math.abs(c.width - r.width) < 2 && Math.abs(c.left - r.left) < 2 && Math.abs(c.top - r.top) < 2;
-  check('起点矩形就是被点击卡片的矩形', sameBox, JSON.stringify({ c, r }));
+  const start = String(result.captured.frames[0].transform || '');
+  const scale = /scale\(([-\d.]+),([-\d.]+)\)/.exec(start);
+  const shift = /translate3d\(([-\d.]+)px,([-\d.]+)px/.exec(start);
+  const sx = scale ? parseFloat(scale[1]) : NaN;
+  const dx = shift ? parseFloat(shift[1]) : NaN;
+  const dy = shift ? parseFloat(shift[2]) : NaN;
+  console.log(`起点 transform = ${start}`);
   check('起点元素是弹窗面板', /modal/.test(result.captured.el), result.captured.el);
+  check('变形强度已减弱：缩放落在 0.96–1.04', sx >= 0.96 && sx <= 1.04, 'sx=' + sx);
+  check('变形强度已减弱：位移限幅 ≤40px', Math.abs(dx) <= 40 && Math.abs(dy) <= 40, `dx=${dx} dy=${dy}`);
+  check('起点带淡入（不透明度 <1）', result.captured.frames[0].opacity < 1, String(result.captured.frames[0].opacity));
+  check('终点回到原位满不透明', /translate3d\(0,0,0\)/.test(String(result.captured.frames[1].transform)) && result.captured.frames[1].opacity === 1, JSON.stringify(result.captured.frames[1]));
 }
 check('面板已进入打开态', result.modalOpen === true, String(result.modalOpen));
 check('面板在跑 WAAPI 动画', result.panelAnims.length > 0, JSON.stringify(result.panelAnims));

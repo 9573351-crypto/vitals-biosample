@@ -4,7 +4,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 当前版本 | **1.21.0**（versionCode 36） |
+| 当前版本 | **1.21.1**（versionCode 37） |
 | 包名 | `com.vitals.android` |
 | 形态 | Android 应用（WebView + JS 桥 + SQLite），`web-preview/` 为浏览器预览版 |
 | 更新来源 | 本仓库的 GitHub Release |
