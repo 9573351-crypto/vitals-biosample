@@ -602,7 +602,7 @@ img{display:block}
 /* ==================== 导出弹窗（侧栏「导出」） ==================== */
 /* [hidden] 必须真的隐藏：display:flex 的优先级与 [hidden] 同级，写在后面会把它压掉。
    这条放在导出弹窗样式最前面，供 .export-range / .export-format / .export-toggle 共用。 */
-.export-range[hidden],.export-format[hidden],.export-toggle[hidden],.export-scope[hidden],.export-outcome[hidden]{display:none!important}
+.export-range[hidden],.export-toggle[hidden],.export-scope[hidden],.export-outcome[hidden],.export-format-note[hidden]{display:none!important}
 /* 内容变长时让弹窗内部可滚动，避免底部按钮/勾选框被裁切（flex 子项必须允许收缩）。 */
 .modal-body{min-height:0;-webkit-overflow-scrolling:touch}
 .export-modal{width:560px;max-width:calc(100vw - 32px)}
@@ -633,11 +633,26 @@ img{display:block}
 .export-format[hidden]{display:none}
 .export-format-label{font-size:12px;font-weight:600;color:var(--text-2);flex:none}
 .export-format-pick{display:inline-flex;gap:6px;padding:4px;border-radius:12px;background:rgba(118,118,128,0.1)}
-.export-format-pick .seg-btn{min-height:36px}
+.export-format-pick .seg-btn{min-height:36px;transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard),border-color var(--dur-fast) var(--ease-standard)}
 .export-format-pick .seg-btn[aria-checked="true"]{
   color:#fff;background:linear-gradient(135deg,#0a69ff,#0a57bf);border-color:transparent;
 }
 .export-format-pick .seg-btn:disabled{opacity:.5;cursor:not-allowed}
+/* 内容项上的格式徽标：让用户一眼看到该项支持哪些文件类型 */
+.esi-format{
+  display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;
+  font-size:10px;font-weight:600;font-style:normal;letter-spacing:.02em;
+  color:var(--text-2);background:rgba(118,118,128,0.14);vertical-align:1px;
+}
+.export-scope-item[aria-checked="true"] .esi-format{color:var(--blue);background:rgba(10,105,255,0.12)}
+/* 多选：方角勾选框，与单选圆点区分 */
+.esi-check{border-radius:6px}
+.export-scope-item[aria-checked="true"] .esi-check::after{border-radius:2px}
+.export-format-note{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--text-2)}
+.export-format-note[hidden]{display:none!important}
+@media(max-width:600px){
+  .export-format{flex-direction:column;align-items:flex-start;gap:8px}
+}
 .export-outcome{
   margin-top:10px;padding:8px 12px;border-radius:12px;
   background:rgba(118,118,128,0.08);font-size:12px;line-height:1.5;color:var(--text-2);
