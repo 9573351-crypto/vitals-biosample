@@ -132,6 +132,13 @@
             <button class="btn primary" id="addSampleBtn">＋ 录入样本</button>
           </div>
         </div>
+        <div class="lib-filter" id="libFilter">
+          <div class="lib-filter-scroll" id="libTypeFilter" role="radiogroup" aria-label="按样本类别筛选"></div>
+          <div class="lib-filter-meta">
+            <span id="libCount" class="lib-count" aria-live="polite"></span>
+            <button class="text-btn" id="clearTypeFilter" hidden>清除筛选</button>
+          </div>
+        </div>
         <div class="sample-list glass" id="sampleList"><div class="empty">点击右上角“录入样本”开始创建</div></div>
       </div>
       <div class="library-pane" id="libraryInventoryPane" role="tabpanel" aria-labelledby="libraryInventoryTab" hidden>

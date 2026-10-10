@@ -503,3 +503,40 @@ img{display:block}
 .update-dialog .modal-body{max-height:56vh;overflow:auto}
 .update-dialog-notes{white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.65;color:var(--text);background:rgba(0,0,0,0.03);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-top:10px}
 @media(max-width:720px){.update-card .update-grid{grid-template-columns:1fr}}
+
+/* ==================== 样本库 · 类别检索（HIG：44pt 目标 / ≥4.5:1 对比 / 不单靠颜色） ==================== */
+.lib-filter{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:-4px 0 14px}
+.lib-filter-scroll{
+  display:flex;align-items:center;gap:6px;padding:4px;border-radius:12px;
+  background:rgba(118,118,128,0.1);overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
+  -webkit-overflow-scrolling:touch;max-width:100%;
+}
+.lib-filter-scroll::-webkit-scrollbar{display:none}
+.lib-chip{
+  display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
+  min-height:44px;padding:0 16px;border-radius:9px;
+  font-size:14px;font-weight:600;line-height:1.2;white-space:nowrap;
+  color:var(--text-2);background:transparent;border:none;
+  transition:background .18s,color .18s,box-shadow .18s;
+}
+.lib-chip:hover{color:var(--text);background:rgba(255,255,255,0.55)}
+.lib-chip:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(10,105,255,0.35)}
+/* 选中态用比 .btn.primary 更深的蓝：白字对比 4.69–6.71:1（原渐变起点 #0A84FF 仅 3.65:1，未达 4.5:1） */
+.lib-chip[aria-checked="true"]{
+  color:#fff;background:linear-gradient(135deg,#0a69ff,#0a57bf);
+  box-shadow:0 2px 8px rgba(10,105,255,0.28);
+}
+.lib-chip[aria-checked="true"]:hover{color:#fff;background:linear-gradient(135deg,#0a69ff,#0a57bf)}
+/* 除配色外再用勾号标记选中项，满足「不单靠颜色传达含义」 */
+.lib-chip-check{display:none;width:12px;height:12px;flex:0 0 auto}
+.lib-chip[aria-checked="true"] .lib-chip-check{display:block}
+.lib-chip-count{font-size:11px;font-weight:600;opacity:.75;font-variant-numeric:tabular-nums}
+.lib-chip[aria-checked="true"] .lib-chip-count{opacity:.9}
+.lib-filter-meta{display:flex;align-items:center;gap:12px;margin-left:auto}
+/* 计数用 text-2（4.66:1）而非 text-3（2.36:1，HIG 未达标） */
+.lib-count{font-size:12.5px;font-weight:600;color:var(--text-2);font-variant-numeric:tabular-nums}
+.lib-filter-meta .text-btn{min-height:44px;padding:0 4px;display:inline-flex;align-items:center}
+@media(max-width:900px){
+  .lib-filter{gap:8px}
+  .lib-filter-meta{margin-left:0;width:100%;justify-content:space-between}
+}

@@ -255,16 +255,109 @@ function addSampleBtnInit(){
   $('#addSampleBtn').addEventListener('click', () => openModal(null));
 }
 
+/* ==================== 样本库 · 类别检索 ====================
+   按样本类别（全血 / 血清 / 血浆 + 数据中出现的其它类别）筛选样本列表。
+   无障碍要点（HIG）：单选组语义 role=radiogroup/radio、44pt 触控高度、≥4.5:1 对比、
+   选中态除配色外另有勾号（不单靠颜色传达含义）、支持 ←/→ 与 Home/End 键切换。 */
+let libTypeFilter = 'all';
+const LIB_TYPE_ORDER = ['全血','血清','血浆'];
+function libTypeOptions(){
+  const counts = new Map();
+  Object.values(state.s.samples||{}).forEach(x=>{
+    const t = (x && x.type) ? String(x.type) : '未分类';
+    counts.set(t,(counts.get(t)||0)+1);
+  });
+  const rest = [...counts.keys()].filter(t=>!LIB_TYPE_ORDER.includes(t))
+    .sort((a,b)=> (a==='未分类'?1:0)-(b==='未分类'?1:0) || a.localeCompare(b,'zh'));
+  const options = [{value:'all',label:'全部',count:Object.keys(state.s.samples||{}).length}];
+  LIB_TYPE_ORDER.concat(rest).forEach(t=>{
+    // 三个标准类别即使当前为 0 也保留入口（槽位固定，便于确认「确实没有」而不是「筛不出来」）
+    if(counts.has(t) || LIB_TYPE_ORDER.includes(t)) options.push({value:t,label:t,count:counts.get(t)||0});
+  });
+  return options;
+}
+function renderTypeFilter(){
+  const mount = $('#libTypeFilter');
+  if(!mount) return;
+  const options = libTypeOptions();
+  if(!options.some(o=>o.value===libTypeFilter)) libTypeFilter = 'all';
+  const check = '<svg class="lib-chip-check" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 6.4 2.6 2.6L10 3.4"/></svg>';
+  mount.innerHTML = options.map(o=>{
+    const on = o.value===libTypeFilter;
+    const label = o.value==='all' ? `全部 ${o.count}` : `${esc(o.label)} ${o.count}`;
+    return `<button type="button" class="lib-chip" role="radio" data-type="${esc(o.value)}" data-index="${options.indexOf(o)}"`
+      + ` aria-checked="${on?'true':'false'}" tabindex="${on?'0':'-1'}" aria-label="${esc(label)}">`
+      + check + `<span class="lib-chip-label">${esc(o.label)}</span>`
+      + `<span class="lib-chip-count" aria-hidden="true">${o.count}</span></button>`;
+  }).join('');
+}
+function setLibTypeFilter(value, moveFocus){
+  libTypeFilter = value || 'all';
+  renderLibrary();
+  if(moveFocus){
+    const chip = document.querySelector(`#libTypeFilter .lib-chip[data-type="${libTypeFilter}"]`);
+    if(chip) chip.focus();
+  }
+}
+function bindLibraryFilter(){
+  const mount = $('#libTypeFilter');
+  if(!mount) return;
+  mount.addEventListener('click', (e)=>{
+    const chip = e.target.closest('.lib-chip');
+    if(chip) setLibTypeFilter(chip.dataset.type, false);
+  });
+  mount.addEventListener('keydown', (e)=>{
+    const keys = ['ArrowRight','ArrowLeft','ArrowDown','ArrowUp','Home','End'];
+    if(!keys.includes(e.key)) return;
+    const chips = Array.from(mount.querySelectorAll('.lib-chip'));
+    if(!chips.length) return;
+    e.preventDefault();
+    const current = chips.findIndex(c=>c.getAttribute('aria-checked')==='true');
+    let next = current < 0 ? 0 : current;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown') next = (current + 1 + chips.length) % chips.length;
+    else if(e.key==='ArrowLeft'||e.key==='ArrowUp') next = (current - 1 + chips.length) % chips.length;
+    else if(e.key==='Home') next = 0;
+    else if(e.key==='End') next = chips.length - 1;
+    setLibTypeFilter(chips[next].dataset.type, true);
+  });
+}
+function clearLibraryFilters(){
+  libTypeFilter = 'all';
+  const input = $('#searchInput');
+  if(input) input.value = '';
+  renderLibrary();
+}
+function bindLibraryFilterOnce(){
+  if(bindLibraryFilterOnce.done) return;
+  bindLibraryFilterOnce.done = true;
+  bindLibraryFilter();
+  const clearBtn = $('#clearTypeFilter');
+  if(clearBtn) clearBtn.addEventListener('click', clearLibraryFilters);
+}
+bindLibraryFilterOnce();
+
 function renderLibrary(){
   const box = $('#sampleList');
   const q = ($('#searchInput').value||'').trim().toLowerCase();
-  const samp = Object.values(state.s.samples).filter(x => {
+  const total = Object.keys(state.s.samples||{}).length;
+  const filtered = Object.values(state.s.samples).filter(x => {
+    if(libTypeFilter!=='all' && String(x.type||'未分类')!==libTypeFilter) return false;
     if(!q) return true;
     return (x.name+' '+x.code+' '+x.type+' '+x.loc).toLowerCase().includes(q);
   }).sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+
+  renderTypeFilter();
+  const countEl = $('#libCount');
+  if(countEl) countEl.textContent = `共 ${total} 个样本 · 显示 ${filtered.length}`;
+  const clearBtn = $('#clearTypeFilter');
+  if(clearBtn) clearBtn.hidden = (libTypeFilter==='all' && !q);
+
+  const samp = filtered;
   if(!samp.length){
-    box.innerHTML = q ? '<div class="empty">未找到匹配样本</div>' : '<div class="empty">点击右上角“录入样本”开始创建</div>';
-    // 清理尾部
+    const activeFilter = libTypeFilter!=='all' ? `「${esc(libTypeFilter)}」` : '';
+    box.innerHTML = (activeFilter||q)
+      ? `<div class="empty">没有符合${activeFilter}${q?'与搜索关键词':''}的样本</div>`
+      : '<div class="empty">点击右上角“录入样本”开始创建</div>';
     return;
   }
   box.innerHTML = samp.map(x => {
@@ -340,7 +433,6 @@ function deleteSample(id){
 }
 $('#searchInput').addEventListener('input', renderLibrary);
 $('#clearSearch').addEventListener('click', ()=>{ $('#searchInput').value=''; renderLibrary(); });
-
 /* ==================== 二维码（手机扫码查看样本信息） ==================== */
 // qrcode-generator 默认 stringToBytes 按 charCodeAt 截断（非 UTF-8），中文扫码会乱码；
 // 注入 UTF-8 编码器，扫描器按 UTF-8 解码即可正常显示中文。
