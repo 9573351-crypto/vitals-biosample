@@ -1087,17 +1087,17 @@ function saveTextFile(name, content, mime, okMessage){
           （samples / records / settings / meta），summary 按实际内容重写。
    真正做不到的只有「CSV + 照片」：照片是 dataURL 图片，文本表格放不下 → 照片开关置灰并说明。 */
 const EXPORT_SCOPES = [
-  { id:'backup',   label:'完整备份', desc:'样本、照片、记录与偏好设置，可在其它设备导入恢复', formats:['json'],   count:'samples' },
-  { id:'samples',  label:'样本清单', desc:'编号、类别、位置、状态、采集时间与温度',           formats:['json','csv'], count:'samples' },
-  { id:'records',  label:'操作记录', desc:'出入库等操作明细，可按日期与类型筛选',             formats:['json','csv'], count:'records' },
-  { id:'env',      label:'温度历史', desc:'每个样本一个温度点一行，便于做曲线分析',           formats:['json','csv'], count:'env' },
-  { id:'settings', label:'偏好设置', desc:'温度报警阈值等本机配置',                           formats:['json'],   count:'samples' }
+  { id:'backup',   label:'完整备份', desc:'样本、照片、记录与偏好设置，可在其它设备导入恢复', formats:['json'] },
+  { id:'samples',  label:'样本清单', desc:'编号、类别、位置、状态、采集时间与温度',           formats:['json','csv'] },
+  { id:'records',  label:'操作记录', desc:'出入库等操作明细，可按日期与类型筛选',             formats:['json','csv'] },
+  { id:'env',      label:'温度历史', desc:'每个样本一个温度点一行，便于做曲线分析',           formats:['json','csv'] },
+  { id:'settings', label:'阈值设置', desc:'温度报警的上限与下限阈值',                         formats:['json'] }
 ];
 const EXPORT_FORMATS = {
   json: { id:'json', label:'JSON', desc:'完整结构，可再导入恢复；备份自带 schema 版本与校验和' },
   csv:  { id:'csv',  label:'CSV',  desc:'UTF-8 + BOM，Excel 双击即开；不含照片' }
 };
-let exportFormats = ['json'];
+let exportFormat = 'json';        // 文件类型单选：一次导出一份文件
 let exportScopes = ['backup'];
 let exportCounts = { samples:0, records:0, env:0 };
 
@@ -1107,37 +1107,36 @@ function nativeForFormat(f){ return f === 'json' ? Store.canExportBackup() : Sto
 /* 归一化：让「格式集合 × 内容集合」始终自洽，保证任何组合都能真的导出，
    不会出现"勾了却被静默跳过"的组合。 */
 function normalizeExportSelection(){
-  // 1) 内容：只保留"支持当前任一格式 + 原生可用"的项
+  // 1) 当前格式必须在原生能力范围内
+  if(!nativeForFormat(exportFormat)) exportFormat = nativeForFormat('json') ? 'json' : 'csv';
+  // 2) 内容项：只保留"支持当前格式（或完整备份）"的项；若不是备份，剔掉不支持当前格式的
   exportScopes = exportScopes.filter(id => {
-    const d = exportDef(id);
-    return d.formats.some(f => exportFormats.indexOf(f) >= 0 && nativeForFormat(f));
+    if(id === 'backup') return exportFormat === 'json';       // 备份只支持 JSON
+    return exportDef(id).formats.indexOf(exportFormat) >= 0;
   });
   if(!exportScopes.length){
-    const first = EXPORT_SCOPES.find(d => d.formats.some(f => exportFormats.indexOf(f) >= 0 && nativeForFormat(f)));
+    const first = EXPORT_SCOPES.find(d => d.formats.indexOf(exportFormat) >= 0);
     if(first) exportScopes = [first.id];
   }
-  // 2) 格式：只保留"至少一项所选内容支持 + 原生可用"的格式
-  const usable = ['json','csv'].filter(f => nativeForFormat(f) &&
-    (exportScopes.length ? exportScopes : EXPORT_SCOPES.map(d => d.id)).some(id => exportDef(id).formats.indexOf(f) >= 0));
-  exportFormats = exportFormats.filter(f => usable.indexOf(f) >= 0);
-  if(!exportFormats.length) exportFormats = usable.slice(0, 1);
 }
-/* 内容项在当前格式集合下是否可用；不可用时给出具体原因（便于置灰并解释） */
+/* 内容项在当前格式下是否可用；不可用时给出具体原因（便于置灰并解释） */
 function exportScopeState(id){
   const d = exportDef(id);
   const nativeUsable = d.formats.filter(nativeForFormat);
   if(!nativeUsable.length) return { ok:false, reason: d.formats.indexOf('json') >= 0 ? '当前版本原生不支持导出备份' : '当前版本原生不支持 CSV 导出' };
-  if(!nativeUsable.some(f => exportFormats.indexOf(f) >= 0)){
-    return { ok:false, reason: exportFormats.indexOf('csv') >= 0
+  if(nativeUsable.indexOf(exportFormat) < 0){
+    return { ok:false, reason: exportFormat === 'csv'
       ? d.label + '不是表格数据，无法导出为 CSV'
       : d.label + '只能导出为 ' + nativeUsable.map(f => f.toUpperCase()).join(' / ') };
   }
   return { ok:true, reason:'' };
 }
+/* 计数一律按 id 判断，不依赖 EXPORT_SCOPES.count 字段（少一处改漏的机会）。 */
 function exportScopeCount(id){
-  if(id === 'records') return exportCounts.records;
-  if(id === 'env') return exportCounts.env;
-  return exportCounts.samples;   // 样本清单 / 偏好设置 / 完整备份都按样本数展示
+  if(id === 'records') return exportCounts.records || 0;
+  if(id === 'env') return exportCounts.env || 0;
+  if(id === 'settings') return exportCounts.thresholds || 0;   // 阈值设置：阈值条数
+  return exportCounts.samples || 0;   // 样本清单 / 完整备份都按样本数展示
 }
 function exportBytes(){
   return { samples: Object.keys(state.s.samples||{}).length, records: (state.rec||[]).length };
@@ -1152,16 +1151,17 @@ function renderExportModal(){
   if(!mount) return;
   normalizeExportSelection();
 
-  /* 文件类型：可用 ⇔ 所选内容里至少有一项支持它（保证勾选完就能导出） */
+  /* 文件类型：单选（一次导出就是一种格式）。不可用 ⇔ 原生不支持，或所选内容都不支持它。 */
   const fmtWrap = $('#exportFormat');
   if(fmtWrap){
+    const sel = selectedScopes();
     fmtWrap.innerHTML = Object.values(EXPORT_FORMATS).map(f => {
       const nativeOk = nativeForFormat(f.id);
-      const supportedBySelection = selectedScopes().some(id => exportDef(id).formats.indexOf(f.id) >= 0);
+      const supportedBySelection = sel.some(id => exportDef(id).formats.indexOf(f.id) >= 0);
       const enabled = nativeOk && supportedBySelection;
-      const on = exportFormats.indexOf(f.id) >= 0;
+      const on = exportFormat === f.id;
       const reason = !nativeOk ? (f.id === 'json' ? '当前版本原生不支持导出备份' : '当前版本原生不支持 CSV 导出')
-                   : !supportedBySelection ? ('所选内容都只能导出为 ' + exportDef(selectedScopes()[0]).formats.map(x=>x.toUpperCase()).join(' / '))
+                   : !supportedBySelection ? ('所选内容只能导出为 ' + exportDef(sel[0]).formats.map(x=>x.toUpperCase()).join(' / '))
                    : '';
       return '<button type="button" class="seg-btn" role="radio" data-format="' + f.id + '"'
         + ' aria-checked="' + (on ? 'true' : 'false') + '"'
@@ -1169,14 +1169,11 @@ function renderExportModal(){
         + esc(f.label) + '</button>';
     }).join('');
     fmtWrap.querySelectorAll('[data-format]').forEach(btn => {
-      btn.addEventListener('click', () => { if(!btn.disabled) toggleExportFormat(btn.dataset.format); });
+      btn.addEventListener('click', () => { if(!btn.disabled) setExportFormat(btn.dataset.format); });
     });
   }
   const noteEl = $('#exportFormatNote');
-  if(noteEl){
-    const parts = exportFormats.map(f => EXPORT_FORMATS[f].desc);
-    noteEl.textContent = parts.length ? parts.join('；') : '至少选一种文件类型';
-  }
+  if(noteEl) noteEl.textContent = EXPORT_FORMATS[exportFormat].desc;
 
   /* 导出内容：多选；不可用的项置灰并写明原因（格式不匹配 / 原生能力缺失） */
   mount.setAttribute('aria-multiselectable', 'true');
@@ -1189,14 +1186,14 @@ function renderExportModal(){
       + '<span class="esi-radio esi-check" aria-hidden="true"></span>'
       + '<span class="esi-text"><b>' + esc(scope.label) + '<i class="esi-format">' + tag + '</i></b>'
       + '<small>' + esc(scope.desc) + '</small></span>'
-      + '<span class="esi-count">' + exportScopeCount(scope.count) + ' 条</span></button>';
+      + '<span class="esi-count">' + exportScopeCount(scope.id) + ' 条</span></button>';
   }).join('');
   mount.querySelectorAll('.export-scope-item').forEach(btn => {
     btn.addEventListener('click', () => { if(!btn.disabled) toggleExportScope(btn.dataset.scope); });
   });
 
-  /* 照片开关只在选了 JSON 时才有意义（CSV 装不下 dataURL 图片） */
-  const jsonOn = exportFormats.indexOf('json') >= 0;
+  /* 照片开关只在 JSON 下有意义（CSV 装不下 dataURL 图片） */
+  const jsonOn = exportFormat === 'json';
   const photosRow = $('#exportPhotosRow');
   if(photosRow){
     photosRow.hidden = !jsonOn;
@@ -1208,28 +1205,24 @@ function renderExportModal(){
   }
   /* 日期范围只对 CSV 的操作记录有意义（原生 records 导出支持 fromIso/toIso） */
   const range = $('#exportRange');
-  if(range){
-    const recordsCsv = exportScopes.indexOf('records') >= 0 && exportFormats.indexOf('csv') >= 0;
-    range.hidden = !recordsCsv;
-  }
+  if(range) range.hidden = !(exportScopes.indexOf('records') >= 0 && exportFormat === 'csv');
 
   const outcome = $('#exportOutcome');
   if(outcome){
     const ids = selectedScopes();
     const labels = ids.map(id => { const d = exportDef(id); return d.id === 'backup' ? '完整备份' : d.label; });
-    const picks = exportFormats.map(f => EXPORT_FORMATS[f].label).join(' + ');
-    const total = ids.reduce((sum, id) => sum + (id === 'backup' ? exportCounts.samples : exportScopeCount(exportDef(id).count)), 0);
+    const total = ids.reduce((sum, id) => sum + (id === 'backup' ? exportCounts.samples : exportScopeCount(id)), 0);
     const photos = $('#exportPhotos');
     const photoNote = (jsonOn && photos && photos.checked) ? '，含样本照片' : (jsonOn ? '，不含照片' : '');
-    const fileCount = ids.length * exportFormats.length;
-    const formatNote = fileCount > 1 ? ' 将写出 ' + fileCount + ' 个文件。' : (jsonOn
+    const formatNote = jsonOn
       ? ' 备份自带 schema 版本与校验和，导入时会先校验。'
-      : ' CSV 用 UTF-8 + BOM，Excel 双击即开。');
-    outcome.textContent = '将导出：' + labels.join(' + ') + '（' + picks + photoNote + '），共 ' + total + ' 项。' + formatNote;
+      : ' CSV 用 UTF-8 + BOM，Excel 双击即开。';
+    outcome.textContent = '将导出：' + labels.join(' + ') + '（' + EXPORT_FORMATS[exportFormat].label + photoNote + '），共 ' + total + ' 项。'
+      + (ids.length > 1 ? ' 将写出 ' + ids.length + ' 个文件。' : formatNote);
   }
   const confirm = $('#exportConfirm');
   if(confirm){
-    const fileCount = selectedScopes().length * exportFormats.length;
+    const fileCount = selectedScopes().length;
     confirm.disabled = fileCount === 0;
     confirm.textContent = fileCount > 1 ? '导出 ' + fileCount + ' 个文件' : '导出';
   }
@@ -1239,16 +1232,16 @@ function toggleExportScope(id){
   if(i >= 0) exportScopes.splice(i, 1); else exportScopes.push(id);
   renderExportModal();
 }
-function toggleExportFormat(id){
-  const i = exportFormats.indexOf(id);
-  if(i >= 0){ if(exportFormats.length > 1) exportFormats.splice(i, 1); }
-  else exportFormats.push(id);
+function setExportFormat(id){
+  exportFormat = id;
   renderExportModal();
 }
 function openExportModal(){
   if(!saveAll()) return;
   const bytes = exportBytes();
-  exportCounts = { samples: bytes.samples, records: bytes.records, env: bytes.samples };
+  const prefs = (typeof state !== 'undefined' && state && state.set) ? state.set : {};
+  const thresholdCount = (prefs.hi !== undefined ? 1 : 0) + (prefs.lo !== undefined ? 1 : 0);
+  exportCounts = { samples: bytes.samples, records: bytes.records, env: bytes.samples, thresholds: thresholdCount };
   // 记录页的日期/类型筛选是同一批数据的视图，导出沿用它们的当前取值
   const rf = $('#recordFrom'), rt = $('#recordTo'), rfFrom = $('#exportFrom'), rtTo = $('#exportTo');
   if(rfFrom && rf) rfFrom.value = rf.value || '';
@@ -1282,11 +1275,11 @@ function exportJsonPayload(ids, includePhotos){
   if(ids.indexOf('samples') >= 0 || ids.indexOf('env') >= 0) out.samples = full.samples || {};
   if(ids.indexOf('records') >= 0) out.records = full.records || [];
   if(ids.indexOf('settings') >= 0){
-    // 备份 payload 里的 settings 可能为空（原生偏好表还没写入任何键）；
-    // 这里以界面当前偏好为准，保证"导出偏好设置"导出的是真实设置。
-    const fromStore = (full.settings && Object.keys(full.settings).length) ? full.settings : null;
+    // 「阈值设置」只导出温度报警阈值（hi/lo），不是整份偏好快照。
+    // 原生偏好表可能还没写入任何键，所以以界面当前值为准，保证导出的是真实阈值。
     const fromState = (typeof state !== 'undefined' && state && state.set) ? state.set : {};
-    out.settings = fromStore || Object.assign({}, fromState);
+    const pick = (obj, key) => (obj && obj[key] !== undefined) ? obj[key] : null;
+    out.settings = { hi: pick(full.settings, 'hi') ?? pick(fromState, 'hi'), lo: pick(full.settings, 'lo') ?? pick(fromState, 'lo') };
   }
   out.counts = {
     samples: out.samples ? Object.keys(out.samples).length : 0,
@@ -1313,15 +1306,7 @@ function exportCsvCombined(ids, options, sampleIds){
   return { text, sections:{ samples: parts.some(p=>p.id==='samples'), records: parts.some(p=>p.id==='records'), env: parts.some(p=>p.id==='env') } };
 }
 
-function exportFileBase(ids, format){
-  if(format === 'json'){
-    if(ids.indexOf('backup') >= 0) return 'vitals_backup';
-    if(ids.length === 1) return 'vitals_' + ids[0] + '_json';
-    return 'vitals_export_json';
-  }
-  if(ids.length === 1) return 'vitals_' + ids[0] + '_csv';
-  return 'vitals_export_csv';
-}
+
 function exportSuccessMessage(ids, format, includePhotos, csvSections){
   const names = ids.map(id => { const d = exportDef(id); return d.id === 'backup' ? '完整备份' : d.label; });
   const what = names.join(' + ');
@@ -1333,30 +1318,33 @@ function exportSuccessMessage(ids, format, includePhotos, csvSections){
 }
 
 function runExport(){
-  const ids = selectedScopes();
+  const ids = selectedScopes();          // 内容：多选
+  const format = exportFormat;           // 格式：单选
   const options = exportRangeOptions();
   const stamp = Date.now();
+  if(!ids.length || !format) return;
+  if(format === 'json' && !Store.canExportBackup()) { toast('当前版本原生不支持导出备份'); return; }
+  if(format === 'csv' && !Store.canExportCsv()) { toast('当前版本原生不支持 CSV 导出'); return; }
+  // 文件名必须区分内容：多内容导出时若都叫 vitals_export_<format>_<stamp> 会互相覆盖。
+  const basename = id => 'vitals_' + id + '_' + format;
+  let written = 0;
   try{
     ids.forEach(id => {
-      const def = exportDef(id);
-      exportFormats.slice().sort().forEach(format => {          // json 在前，便于预览环境里 JSON 先落盘
-        if(def.formats.indexOf(format) < 0) return;             // 该内容不支持这个格式（如 设置 + CSV）
-        if(format === 'json' && !Store.canExportBackup()) throw new Error('当前版本原生不支持导出备份');
-        if(format === 'csv' && !Store.canExportCsv()) throw new Error('当前版本原生不支持 CSV 导出');
-        if(format === 'json'){
-          const includePhotos = !!($('#exportPhotos') && $('#exportPhotos').checked);
-          const payload = exportJsonPayload([id], includePhotos);
-          saveTextFile(exportFileBase([id], 'json') + '_' + stamp + '.json',
-            JSON.stringify(payload, null, 2), 'application/json',
-            (id === 'backup' ? '完整备份' : exportDef(id).label + '（JSON）') + ' 已导出' + (includePhotos ? '（含照片）' : ''));
-        } else {
-          const sampleIds = Object.keys(state.s.samples||{});
-          const csv = exportCsvCombined([id], options, sampleIds);
-          if(!csv.text){ toast(exportDef(id).label + '：没有可导出的数据'); return; }
-          saveTextFile(exportFileBase([id], 'csv') + '_' + stamp + '.csv', csv.text, 'text/csv',
-            exportSuccessMessage([id], 'csv', false, csv.sections));
-        }
-      });
+      if(format === 'json'){
+        const includePhotos = !!($('#exportPhotos') && $('#exportPhotos').checked);
+        const payload = exportJsonPayload([id], includePhotos);
+        saveTextFile(basename(id) + '_' + stamp + '.json',
+          JSON.stringify(payload, null, 2), 'application/json',
+          (id === 'backup' ? '完整备份' : exportDef(id).label + '（JSON）') + ' 已导出' + (includePhotos ? '（含照片）' : ''));
+        written++;
+      } else {
+        const sampleIds = Object.keys(state.s.samples||{});
+        const csv = exportCsvCombined([id], options, sampleIds);
+        if(!csv.text){ toast(exportDef(id).label + '：没有可导出的数据'); return; }
+        saveTextFile(basename(id) + '_' + stamp + '.csv', csv.text, 'text/csv',
+          exportSuccessMessage([id], 'csv', false, csv.sections));
+        written++;
+      }
     });
     closeExportModal();
   }catch(e){
