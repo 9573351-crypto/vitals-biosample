@@ -81,8 +81,8 @@ const settings = await ev(`(() => ({
 }))()`);
 console.log('设置页 = ' + JSON.stringify(settings));
 check('设置页已无阈值输入控件', settings.hasThresholdInputs === false);
-check('设置页指向新的阈值页', /阈值设置/.test(settings.hint), settings.hint);
 check('设置页保留「一体机内部自动备份」卡片', settings.cards.some(c => /自动备份/.test(c)), JSON.stringify(settings.cards));
+check('设置页不再出现阈值说明文字（按要求精简）', !/阈值/.test(settings.hint || ''), settings.hint);
 
 /* ---- 3. 改一组阈值：持久化 + 告警联动 ---- */
 const target = await ev(`(() => {
