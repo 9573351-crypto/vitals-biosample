@@ -85,6 +85,23 @@ assert.equal(await page.evaluate(()=>nativeCalls.filter(c=>c.name==='commitChang
 await page.evaluate(id=>{openModal(id);$('#fName').value='已编辑样本';$('#modalSave').click();},id);
 assert.equal(await page.evaluate(()=>Object.values(state.s.samples)[0].name),'已编辑样本');
 await page.locator('[data-view="monitor"]').click();
+const temperatureAxis=await page.evaluate(()=>{
+ const now=new Date();now.setHours(12,0,0,0);
+ const day=temperatureDayWindow(now.getTime());
+ const points=temperatureDayPoints([
+  {ts:day.start-1,t:9},{ts:day.start+30*60*1000,t:20},{ts:day.start+12*60*60*1000,t:30},{ts:day.end-1,t:40},{ts:day.end,t:50}
+ ],now.getTime());
+ const x=tempChart.options.scales.x;
+ return {startHour:new Date(day.start).getHours(),spanHours:(day.end-day.start)/(60*60*1000),points,display:x.display,min:x.min,max:x.max,step:x.ticks.stepSize,labels:[temperatureHourLabel(0),temperatureHourLabel(4),temperatureHourLabel(24)]};
+});
+assert.equal(temperatureAxis.startHour,0);
+assert.equal(temperatureAxis.spanHours,24);
+assert.deepEqual(temperatureAxis.points.map(p=>p.x),[0.5,12,24-1/(60*60*1000)]);
+assert.equal(temperatureAxis.display,true);
+assert.equal(temperatureAxis.min,0);
+assert.equal(temperatureAxis.max,24);
+assert.equal(temperatureAxis.step,4);
+assert.deepEqual(temperatureAxis.labels,['00:00','04:00','24:00']);
 await page.evaluate(()=>parseIncoming('{"temp":6.25,"id":"TEST-001"}\n'));
 assert.equal(await page.locator('#tempLiveFormat').innerText(),'JSON');
 await page.evaluate(()=>parseIncoming('T:7.5\n'));

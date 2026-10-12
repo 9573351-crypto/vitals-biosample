@@ -1796,7 +1796,7 @@ function reloadUI(){
 function refreshBuildTag(){
   const bt = $('#buildTag');
   if(!bt) return;
-  const version = String((window.__VITALS && window.__VITALS.version) || 'v1.21.7').replace(/^v/i, '');
+  const version = String((window.__VITALS && window.__VITALS.version) || 'v1.21.8').replace(/^v/i, '');
   bt.textContent = `Android ${version} · 一体机内部自动备份`;
 }
 
@@ -2190,25 +2190,40 @@ window.pickSample = function(id){
 
 /* ==================== 温度图表（监测页） ==================== */
 let tempChart=null;
+function temperatureDayWindow(now=Date.now()){
+  const startDate=new Date(now);
+  startDate.setHours(0,0,0,0);
+  const start=startDate.getTime();
+  return {start:start,end:start+24*60*60*1000};
+}
+function temperatureDayPoints(history,now=Date.now()){
+  const day=temperatureDayWindow(now);
+  return (history||[])
+    .filter(point=>point&&Number.isFinite(Number(point.ts))&&Number.isFinite(Number(point.t))&&Number(point.ts)>=day.start&&Number(point.ts)<day.end)
+    .map(point=>({x:(Number(point.ts)-day.start)/(60*60*1000),y:Number(point.t)}));
+}
+function temperatureHourLabel(value){
+  const hour=Math.round(Number(value));
+  return String(hour).padStart(2,'0')+':00';
+}
 function renderMonitorCharts(){
   const ctx1 = $('#chartTemp');
   if(!ctx1) return;
   updateMonitorSelUI();
   const x = state.s.samples[monitorSelId];
   const hist = x ? tempSeriesPoints(x.id) : [];
-  const labels = hist.map((h,i)=>i);
-  const temps = hist.map(h=>h.t);
+  const dayPoints = temperatureDayPoints(hist);
+  const temps = dayPoints.map(point=>point.y);
   // fill 到数据下界而非 y=0，避免全负数据（如 -80℃ 低温样本）填充整个图表
   const tempFloor = Math.min(0, ...temps.filter(v=>v!=null));
   const fillTo = v => ({ target: { value: v } });
   if(tempChart){
-    tempChart.data.labels = labels;
-    tempChart.data.datasets[0].data = temps;
+    tempChart.data.datasets[0].data = dayPoints;
     tempChart.data.datasets[0].fill = fillTo(tempFloor);
     tempChart.update('none');
   } else {
-    tempChart = new Chart(ctx1, { type:'line', data:{labels, datasets:[{data:temps,borderColor:'#0a69ff',backgroundColor:'rgba(10,105,255,0.08)',fill:fillTo(tempFloor),tension:.4,pointRadius:0,borderWidth:2}]},
-      options:{responsive:true,aspectRatio:2.4,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:11},color:'#6e6e73'}}}} });
+    tempChart = new Chart(ctx1, { type:'line', data:{datasets:[{data:dayPoints,borderColor:'#0a69ff',backgroundColor:'rgba(10,105,255,0.08)',fill:fillTo(tempFloor),tension:.4,pointRadius:0,borderWidth:2}]},
+      options:{responsive:true,aspectRatio:2.4,parsing:false,plugins:{legend:{display:false}},scales:{x:{type:'linear',display:true,min:0,max:24,bounds:'ticks',grid:{color:'rgba(0,0,0,0.04)'},ticks:{stepSize:4,autoSkip:false,maxRotation:0,font:{size:11},color:'#6e6e73',callback:temperatureHourLabel},title:{display:true,text:'今日 24 小时',color:'#86868b',font:{size:11,weight:'normal'}}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:11},color:'#6e6e73'}}}} });
   }
 
 }
