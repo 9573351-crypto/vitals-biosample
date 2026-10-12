@@ -43,6 +43,18 @@ assert.equal(await page.locator('#backupNow').isDisabled(),true);
 assert.equal(await page.locator('#statTotal').innerText(),'0');
 assert.equal(await page.locator('#statOnline').innerText(),'2');
 assert.equal(await page.locator('#statOnlineDetail').innerText(),'温控 0 · 机械 0 · 扫码枪 1 · 打印机 1');
+const thresholdMigration=await page.evaluate(()=>{
+ const original=JSON.parse(JSON.stringify(state.set.thresholds||{}));
+ state.set.thresholds={A:{lo:30,hi:65,custom:false},B:{lo:12,hi:34,custom:true},C:{lo:25,hi:60,custom:false}};
+ state.set.thresholdsSeeded=1;
+ const changed=seedThresholds(),migrated=JSON.parse(JSON.stringify(state.set.thresholds));
+ state.set.thresholds=original;seedThresholds();renderTemperatureRanges();
+ return {changed,migrated};
+});
+assert.equal(thresholdMigration.changed,true);
+assert.deepEqual(thresholdMigration.migrated.A,{lo:20,hi:40,custom:false});
+assert.deepEqual(thresholdMigration.migrated.B,{lo:12,hi:34,custom:true});
+assert.deepEqual(thresholdMigration.migrated.C,{lo:25,hi:50,custom:false});
 await page.evaluate(()=>onAndroidEvent('devices','external','{"scanner":2,"printer":0}'));
 assert.equal(await page.locator('#statOnline').innerText(),'2');
 assert.equal(await page.locator('#statOnlineDetail').innerText(),'温控 0 · 机械 0 · 扫码枪 2 · 打印机 0');
@@ -88,21 +100,25 @@ assert.equal(await page.evaluate(()=>emaSmooth(10,20,EMA_ALPHA)),13);
 await page.evaluate(()=>parseIncoming('B1 T=37.50\n'));
 assert.equal(await page.locator('#tempB1').innerText(),'30.50');
 assert.equal(await page.locator('#tempLiveFormat').innerText(),'类别通道');
-assert.deepEqual(await page.locator('.temp-range').allInnerTexts(),['适宜存储温度 30℃ ~ 65℃','适宜存储温度 25℃ ~ 65℃','适宜存储温度 25℃ ~ 60℃']);
+assert.deepEqual(await page.locator('.temp-range').allInnerTexts(),['适宜存储温度 20℃ ~ 40℃','适宜存储温度 15℃ ~ 35℃','适宜存储温度 25℃ ~ 50℃']);
 // Zero is a valid limit; invalid bounds and failed saves must not report success.
-await page.evaluate(()=>{$('#setHi').value='0';$('#setHi').dispatchEvent(new Event('change'));});
-assert.equal(await page.evaluate(()=>Store.result(AndroidHost.getSettings()).hi),0);
-await page.evaluate(()=>{$('#setLo').value='1';$('#setLo').dispatchEvent(new Event('change'));});
-assert.equal(await page.evaluate(()=>state.set.lo),-88);
-assert.equal(await page.locator('#setLo').inputValue(),'-88');
+await page.locator('[data-view="thresholds"]').click();
+await page.evaluate(()=>{const row=document.querySelector('.threshold-row[data-code="B"]'),lo=row.querySelector('[data-th="lo"]');lo.value='0';lo.dispatchEvent(new Event('change'));});
+assert.equal(await page.evaluate(()=>state.set.thresholds.B.lo),0);
+assert.equal(await page.locator('#tempRangeB2').innerText(),'适宜存储温度 0℃ ~ 35℃');
+await page.evaluate(()=>{const row=document.querySelector('.threshold-row[data-code="B"]'),lo=row.querySelector('[data-th="lo"]');lo.value='36';lo.dispatchEvent(new Event('change'));});
+assert.equal(await page.evaluate(()=>state.set.thresholds.B.lo),0);
+assert.equal(await page.locator('.threshold-row[data-code="B"] [data-th="lo"]').inputValue(),'0');
 const settingToasts=await page.evaluate(()=>{
  const original=toast,messages=[];toast=message=>messages.push(message);
- try{window.failCommit=true;$('#setHi').value='5';$('#setHi').dispatchEvent(new Event('change'));}finally{toast=original;}
+ try{const row=document.querySelector('.threshold-row[data-code="B"]'),hi=row.querySelector('[data-th="hi"]');window.failCommit=true;hi.value='34';hi.dispatchEvent(new Event('change'));}finally{toast=original;}
  return messages;
 });
+await page.waitForTimeout(50);
 assert.ok(settingToasts.some(x=>x.startsWith('保存失败')));
 assert.ok(!settingToasts.includes('已保存'));
-assert.equal(await page.evaluate(()=>state.set.hi),0);
+assert.equal(await page.evaluate(()=>state.set.thresholds.B.hi),35);
+await page.evaluate(()=>{delete state.set.thresholds.B;seedThresholds();saveAll();renderThresholds();renderTemperatureRanges();});
 await page.evaluate(()=>{window.failCommit=true;state.s.samples[Object.keys(state.s.samples)[0]].name='不能保存';saveAll();});
 assert.equal(await page.evaluate(()=>Object.values(state.s.samples)[0].name),'已编辑样本');
 await page.evaluate(id=>setSampleStatus(id,'in'),id);await page.locator('#confirmYes').click();
@@ -135,7 +151,7 @@ assert.equal(await page.locator('#scannerVerifyOut,#scannerVerifyStatus').count(
 assert.match(await page.locator('.android-check').innerText(),/样本已取出/);
 await page.locator('#positionChecked').check();await page.locator('#finishTask').click();
 assert.equal(await page.evaluate(()=>Object.values(state.s.samples)[0].slot),undefined);
-await page.evaluate(()=>exportData());assert.equal((await page.evaluate(()=>window.lastExport)).samples[id].status,'out');
+await page.evaluate(()=>{openExportModal();runExport();});assert.equal((await page.evaluate(()=>window.lastExport)).samples[id].status,'out');
 await page.evaluate(id=>{openDetail(id);$('#printBtn').click();$('#systemPrint').click();$('#closeDetail').click();},id);
 assert.equal(await page.evaluate(()=>window.printCalled),true);
 // Preview must preserve the complete Chinese QR payload; no USB job without paper confirmation.

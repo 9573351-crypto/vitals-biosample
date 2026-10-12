@@ -65,6 +65,11 @@ check('进入阈值设置页且标题正确', page1.view === 'view-thresholds' &
 check('分组与样本库口径一致（含库中出现的 DNA）',
   ['全血', '血清', '血浆', 'DNA'].every(n => page1.rows.some(r => r.name === n)), page1.rows.map(r => r.name).join(','));
 check('每组显示默认区间', page1.rows.every(r => /默认 -?\d+(\.\d+)? ~ -?\d+(\.\d+)? ℃/.test(r.note)), JSON.stringify(page1.rows.map(r => r.note)));
+const expectedDefaults = { '全血': ['20', '40'], '血清': ['15', '35'], '血浆': ['25', '50'] };
+check('三类默认阈值与 1.21.7 配置一致', Object.entries(expectedDefaults).every(([name, values]) => {
+  const row = page1.rows.find(r => r.name === name);
+  return row && row.lo === values[0] && row.hi === values[1] && row.note.includes('默认 ' + values[0] + ' ~ ' + values[1] + ' ℃');
+}), JSON.stringify(page1.rows.map(r => ({ name: r.name, lo: r.lo, hi: r.hi, note: r.note }))));
 check('初始不显示「已自定义」', page1.rows.every(r => !/已自定义/.test(r.note)), JSON.stringify(page1.rows.map(r => r.note)));
 check('输入控件符合统一体系（≥44px、11px 圆角）', page1.rows.every(r => r.inputH >= 44 && r.radius === '11px'), JSON.stringify(page1.rows.map(r => r.inputH + '/' + r.radius)));
 check('按钮高度 ≥44px', page1.rows.every(r => r.btnH >= 44), JSON.stringify(page1.rows.map(r => r.btnH)));

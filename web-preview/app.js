@@ -1055,7 +1055,8 @@ function thresholdForSample(sample){
   const code = sample ? MotionCore.categoryCodes[sample.type] : '';
   return thresholdForCategory(code);
 }
-/* 首次使用时把默认值落库，让「阈值设置」页显示的就是实际生效值 */
+/* 把默认值落库，让「阈值设置」页显示的就是实际生效值。
+   升级时自动更新 custom:false 的旧默认值；用户真正自定义的值保持不变。 */
 function seedThresholds(){
   if(!state.set.thresholds || typeof state.set.thresholds !== 'object') state.set.thresholds = {};
   let changed = false;
@@ -1074,10 +1075,19 @@ function seedThresholds(){
   }
   thresholdGroups().forEach(group => {
     if(!group.code) return;
-    if(state.set.thresholds[group.code]) return;
     const def = defaultThresholdFor(group.code);
-    state.set.thresholds[group.code] = { lo: def.lo, hi: def.hi, custom: false };
-    changed = true;
+    const entry = state.set.thresholds[group.code];
+    const matchesDefault = !!(entry && Number(entry.lo) === def.lo && Number(entry.hi) === def.hi);
+    if(!entry || entry.custom === false){
+      if(!entry || !matchesDefault || entry.custom !== false){
+        state.set.thresholds[group.code] = { lo: def.lo, hi: def.hi, custom: false };
+        changed = true;
+      }
+    }else if(matchesDefault){
+      // 自定义值恰好等于本版默认值时，归一化为默认状态。
+      entry.custom = false;
+      changed = true;
+    }
   });
   return changed;
 }
@@ -1140,7 +1150,7 @@ function refreshAlerts(){
     const th = thresholdForSample(x);
     x.alert = (t > th.hi || t < th.lo) ? 'bad' : ((t > th.hi - 2.5 || t < th.lo + 2.5) ? 'warn' : 'good');
   });
-  recomputeStats(); refreshStats(); renderLibrary(); renderFeed();
+  recomputeStats(); refreshStats(); renderLibrary(); renderFeed(); renderTemperatureRanges();
 }
 function fillSettings(){
   // 设置页已无阈值项；保留函数以兼容既有调用
@@ -1786,7 +1796,8 @@ function reloadUI(){
 function refreshBuildTag(){
   const bt = $('#buildTag');
   if(!bt) return;
-  bt.textContent = `Android 1.6.2 · 圆槽编号不补零 · 样本 ${state.s.total||0}`;
+  const version = String((window.__VITALS && window.__VITALS.version) || 'v1.21.7').replace(/^v/i, '');
+  bt.textContent = `Android ${version} · 一体机内部自动备份`;
 }
 
 /* ==================== 弹窗 toast 分流（无覆盖） ==================== */
@@ -2240,7 +2251,8 @@ function startHttpBridge(){
 function renderTemperatureRanges(){
   Object.entries(MotionCore.temperatureChannels).forEach(([channel,config])=>{
     const element=$('#tempRange'+channel);
-    if(element)element.textContent=`适宜存储温度 ${config.lo}℃ ~ ${config.hi}℃`;
+    const threshold=thresholdForCategory(config.category);
+    if(element)element.textContent=`适宜存储温度 ${threshold.lo}℃ ~ ${threshold.hi}℃`;
   });
 }
 

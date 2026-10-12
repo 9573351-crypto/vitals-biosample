@@ -10,10 +10,10 @@ test('mechanical command has operation and category-slot only',()=>{
  assert.throws(()=>core.command({id:'SB-001',type:'未知'},'in',1));
 });
 test('temperature board channels map to sample categories',()=>{
- assert.deepEqual(core.temperatureChannels.B1,{category:'A',type:'全血',lo:30,hi:65});
- assert.deepEqual(core.temperatureChannels.B2,{category:'B',type:'血清',lo:25,hi:65});
- assert.deepEqual(core.temperatureChannels.B3,{category:'C',type:'血浆',lo:25,hi:60});
- assert.deepEqual(core.thresholdFor('B'),{lo:25,hi:65});
+ assert.deepEqual(core.temperatureChannels.B1,{category:'A',type:'全血',lo:20,hi:40});
+ assert.deepEqual(core.temperatureChannels.B2,{category:'B',type:'血清',lo:15,hi:35});
+ assert.deepEqual(core.temperatureChannels.B3,{category:'C',type:'血浆',lo:25,hi:50});
+ assert.deepEqual(core.thresholdFor('B'),{lo:15,hi:35});
  assert.equal(core.thresholdFor('H'),null);
 });
 test('plain mechanical feedback is correlated by sample id',()=>{

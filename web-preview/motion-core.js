@@ -1,7 +1,7 @@
 /* Pure protocol/state helpers shared with meaningful node tests. */
 (function(root){
   const categoryCodes=Object.freeze({'全血':'A','血清':'B','血浆':'C','DNA':'D','RNA':'E','尿液':'F','组织切片':'G','其他':'H'});
-  const temperatureChannels=Object.freeze({B1:{category:'A',type:'全血',lo:30,hi:65},B2:{category:'B',type:'血清',lo:25,hi:65},B3:{category:'C',type:'血浆',lo:25,hi:60}});
+  const temperatureChannels=Object.freeze({B1:{category:'A',type:'全血',lo:20,hi:40},B2:{category:'B',type:'血清',lo:15,hi:35},B3:{category:'C',type:'血浆',lo:25,hi:50}});
   const storageTypes=Object.freeze(['全血','血清','血浆']);
   const api={
     categoryCodes,
