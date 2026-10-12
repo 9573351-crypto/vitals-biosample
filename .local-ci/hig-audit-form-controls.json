@@ -1,0 +1,13 @@
+{
+  "checks": [
+    { "type": "target", "name": "记录页 filter 控件（48px）", "w": 200, "h": 48 },
+    { "type": "target", "name": "设备页 select（48px）", "w": 140, "h": 48 },
+    { "type": "target", "name": "图标按钮 44pt 命中区", "w": 44, "h": 44 },
+    { "type": "target", "name": "样本库搜索框（44px 下线）", "w": 300, "h": 44 },
+    { "type": "contrast", "name": "字段标签 text-2/卡片白", "fg": "#6E6E73", "bg": "#FFFFFF" },
+    { "type": "contrast", "name": "输入文字 text/白色控件底", "fg": "#1D1D1F", "bg": "#FFFFFF" },
+    { "type": "contrast", "name": "占位文字（改后 text-2）/白色控件底", "fg": "#6E6E73", "bg": "#FFFFFF" },
+    { "type": "contrast", "name": "select 雪佛龙图标 text-2/白底", "fg": "#6E6E73", "bg": "#FFFFFF" },
+    { "type": "contrast", "name": "日期日历图标 text-2/白底", "fg": "#6E6E73", "bg": "#FFFFFF" }
+  ]
+}

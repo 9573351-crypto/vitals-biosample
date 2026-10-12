@@ -1012,6 +1012,8 @@ function recordTypeValueForBridge(value){
 /* 记录页筛选控件只绑定一次；缺控件时安静跳过（兼容旧 index.html 缓存）。 */
 function bindRecordFilters(){
   const on = (sel, evt, fn) => { const el = $(sel); if(el) el.addEventListener(evt, fn); };
+  // 记录类型用自绘下拉（系统 <select> 的弹出面板无法定制，与应用语言不一致）
+  SelectPicker.attach($('#recordType'));
   on('#recordFrom','change', ()=>renderRecords(true));
   on('#recordTo','change', ()=>renderRecords(true));
   on('#recordType','change', ()=>renderRecords(true));
@@ -1047,6 +1049,155 @@ $('#resetBtn').addEventListener('click', ()=>{
     toast('已清空全部数据');
   });
 });
+
+
+/* ==================== 自绘下拉（SelectPicker）====================
+   系统 <select> 的弹出面板无法用 CSS 定制（Chromium 在 Android 上用系统对话框渲染），
+   与应用的圆角/玻璃语言不一致。这里保留 <select> 作为数据源，弹出面板自绘：
+   选项仍由原有逻辑写进 <select>，组件只负责展示与回写，避免两份选项定义漂移。 */
+const SelectPicker = (() => {
+  let panel = null, trigger = null, select = null, active = 0;
+  let suppressClick = false;   // 键盘选中后焦点回到 trigger 会补发一次 click，需忽略
+
+  function ensurePanel(){
+    if(panel && document.body.contains(panel)) return panel;
+    panel = document.createElement('div');
+    panel.className = 'sp-panel';
+    panel.setAttribute('role', 'listbox');
+    panel.hidden = true;
+    document.body.appendChild(panel);
+    return panel;
+  }
+  function isOpen(){ return !!panel && !panel.hidden; }
+  function optionsOf(){ return select ? Array.from(select.options).map(o => ({ value: o.value, label: o.textContent.trim() })) : []; }
+
+  function build(){
+    const opts = optionsOf();
+    active = Math.max(0, opts.findIndex(o => o.value === select.value));
+    panel.innerHTML = opts.map((o, i) =>
+      '<button type="button" class="sp-item" role="option" data-index="' + i + '"'
+      + ' aria-selected="' + (i === active ? 'true' : 'false') + '">'
+      + '<span class="sp-label">' + esc(o.label) + '</span>'
+      + '<span class="sp-check" aria-hidden="true">' + (i === active ? '\u2713' : '') + '</span>'
+      + '</button>').join('');
+    panel.querySelectorAll('.sp-item').forEach(btn => {
+      btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); choose(Number(btn.dataset.index)); });
+      btn.addEventListener('mousemove', () => highlight(Number(btn.dataset.index)));
+    });
+  }
+  function place(){
+    const r = trigger.getBoundingClientRect();
+    const maxH = Math.min(320, Math.max(160, window.innerHeight - r.bottom - 24));
+    panel.style.minWidth = Math.max(160, Math.round(r.width)) + 'px';
+    panel.style.maxHeight = maxH + 'px';
+    panel.hidden = false;                       // 先显示再量高度，避免首帧位置跳动
+    const ph = Math.min(panel.scrollHeight, maxH);
+    const below = r.bottom + 6;
+    const top = (window.innerHeight - below < ph + 16 && r.top > ph + 16) ? (r.top - ph - 6) : below;
+    panel.style.left = Math.round(r.left) + 'px';
+    panel.style.top = Math.round(Math.max(8, top)) + 'px';
+  }
+  function highlight(i){
+    active = i;
+    panel.querySelectorAll('.sp-item').forEach(btn => {
+      const on = Number(btn.dataset.index) === i;
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      btn.querySelector('.sp-check').textContent = on ? '\u2713' : '';
+      if(on && btn.scrollIntoView) btn.scrollIntoView({ block: 'nearest' });
+    });
+  }
+  function open(){
+    if(!select || !trigger || trigger.disabled) return;
+    close();
+    ensurePanel();
+    build();
+    place();
+    trigger.classList.add('sp-active');
+    trigger.setAttribute('aria-expanded', 'true');
+    try{ trigger.focus(); }catch(e){ /* 无头环境可能不支持 */ }
+    document.addEventListener('pointerdown', onOutside, true);
+    document.addEventListener('mousedown', onOutside, true);
+    document.addEventListener('keydown', onDocKey, true);
+  }
+  function close(){
+    if(panel) panel.hidden = true;
+    if(trigger){
+      trigger.classList.remove('sp-active');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+    document.removeEventListener('pointerdown', onOutside, true);
+    document.removeEventListener('mousedown', onOutside, true);
+    document.removeEventListener('keydown', onDocKey, true);
+  }
+  function restoreFocus(){ const t = trigger; close(); suppressClick = true; if(t && t.focus) t.focus(); }
+  function choose(i){
+    const opt = select && select.options[i];
+    if(select && opt){
+      select.value = opt.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    restoreFocus();
+  }
+  /* 面板打开时，方向键/回车/Esc 用文档级监听，避免依赖焦点落在某个具体元素上 */
+  function onDocKey(e){
+    if(!isOpen()) return;
+    const n = optionsOf().length;
+    if(e.key === 'ArrowDown'){ e.preventDefault(); highlight(Math.min(n - 1, active + 1)); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); highlight(Math.max(0, active - 1)); }
+    else if(e.key === 'Home'){ e.preventDefault(); highlight(0); }
+    else if(e.key === 'End'){ e.preventDefault(); highlight(n - 1); }
+    else if(e.key === 'Enter' || e.key === ' '){
+      // 必须阻止默认行为：否则聚焦的按钮会再被"激活"一次，补发 click 导致面板重开
+      e.preventDefault();
+      e.stopPropagation();
+      choose(active);
+    }
+    else if(e.key === 'Escape'){ e.preventDefault(); restoreFocus(); }
+    else if(e.key === 'Tab'){ close(); }
+  }
+  function onOutside(e){
+    if(panel && panel.contains(e.target)) return;
+    if(trigger && trigger.contains(e.target)) return;
+    close();
+  }
+  function onTriggerKey(e){
+    if(isOpen()) return;                                  // 打开后由文档级监听接管
+    if(['ArrowDown','ArrowUp',' ','Enter'].includes(e.key)){ e.preventDefault(); open(); }
+  }
+
+  /* 给一个 <select> 装上自绘下拉：原生 select 只作数据源与值载体 */
+  function attach(el){
+    if(!el || el.dataset.spAttached) return;
+    el.dataset.spAttached = '1';
+    const wrap = document.createElement('div');
+    wrap.className = 'sp-wrap';
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(el);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sp-trigger';
+    btn.setAttribute('aria-haspopup', 'listbox');
+    btn.setAttribute('aria-expanded', 'false');
+    wrap.appendChild(btn);
+    el.classList.add('sp-native');
+    const sync = () => {
+      const opt = el.options[el.selectedIndex];
+      btn.textContent = opt ? opt.textContent.trim() : '';
+      btn.disabled = el.disabled;
+    };
+    btn.addEventListener('click', () => {
+      select = el; trigger = btn;
+      if(suppressClick){ suppressClick = false; return; }   // 键盘选中后的补发点击，忽略
+      isOpen() ? close() : open();
+    });
+    btn.addEventListener('keydown', onTriggerKey);
+    el.addEventListener('change', sync);
+    // 选项由原逻辑重建后（如 fillRecordTypes）同步显示文本
+    new MutationObserver(sync).observe(el, { childList: true });
+    sync();
+  }
+  return { attach, close, isOpen };
+})();
 
 /* ==================== 导出落盘 ==================== */
 /* Android 走 exportJson；Electron 走主进程；网页预览回退浏览器下载。
@@ -1988,6 +2139,9 @@ function init(){
   bindRecordFilters();
   bindImportUI();
   bindExportModal();
+  // 录入弹窗里的下拉同样换成自绘面板
+  SelectPicker.attach($('#fType'));
+  SelectPicker.attach($('#fSlot'));
   recomputeStats(); refreshStats();
   renderLibrary();
   renderRecords();
