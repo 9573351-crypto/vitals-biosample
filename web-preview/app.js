@@ -113,7 +113,7 @@ function addRecord(sampleName, type, detail, sampleId=null, persist=true, source
 
 /* ==================== 导航 ==================== */
 const VIEW_TITLES = {
-  dashboard:'概览', library:'样本库', devices:'设备连接', monitor:'实时监测', records:'动态记录', settings:'设置'
+  dashboard:'概览', library:'样本库', devices:'设备连接', monitor:'实时监测', records:'动态记录', thresholds:'阈值设置', settings:'设置'
 };/*页面名称映射：英文转中文*/
 $$('.nav-item[data-view]').forEach(btn => {
   btn.addEventListener('click', () => goView(btn.dataset.view));
@@ -132,6 +132,7 @@ function goView(name){
   if(name==='devices'&&window.refreshExternalDevices)window.refreshExternalDevices();
   if(name==='records') renderRecords();
   if(name==='settings') fillSettings();
+  if(name==='thresholds') renderThresholds();
   if(name==='monitor'){ ensureMonitorRefresh(); ensureMonitorSel(); renderRack(); renderMonitorCharts(); }
 }
 function switchLibraryPane(name){
@@ -1022,20 +1023,131 @@ function bindRecordFilters(){
 }
 
 /* ==================== 设置 ==================== */
+/* ==================== 阈值设置（按样本分组）====================
+   分组口径与「样本库」一致：样本库里出现过的类别都会列出，另加三个存储类别兜底。
+   每个分组一对上下限，存 state.set.thresholds[类别码] = {lo,hi}，随备份持久化。
+   解析顺序：分组配置 → 该类别温度通道默认 → 旧全局 hi/lo（兼容老备份）。 */
+function thresholdGroups(){
+  const names = new Set(MotionCore.storageTypes);          // 全血 / 血清 / 血浆 兜底
+  Object.values(state.s.samples || {}).forEach(x => { if(x && x.type) names.add(String(x.type)); });
+  return Array.from(names).map(name => ({ name: name, code: MotionCore.categoryCodes[name] || '' }));
+}
+/* 默认阈值：优先该类别对应的温度通道，其次旧全局值 */
+function defaultThresholdFor(code){
+  const channel = Object.values(MotionCore.temperatureChannels).find(c => c.category === code);
+  const hi = channel && channel.hi != null ? channel.hi : Number(state.set.hi);
+  const lo = channel && channel.lo != null ? channel.lo : Number(state.set.lo);
+  return { lo: lo, hi: hi };
+}
+/* 当前生效阈值：分组配置优先，其次默认 */
+function thresholdForCategory(code){
+  const saved = (state.set.thresholds || {})[code];
+  const def = defaultThresholdFor(code);
+  const lo = saved && Number.isFinite(Number(saved.lo)) ? Number(saved.lo) : def.lo;
+  const hi = saved && Number.isFinite(Number(saved.hi)) ? Number(saved.hi) : def.hi;
+  // 存在不等于"已自定义"：播种也会写入条目，因此用显式 custom 标志区分；
+  // 没有该标志的老条目（用户此前手动改过）按已自定义处理。
+  const custom = !!(saved && saved.custom !== false);
+  return { lo: lo, hi: hi, custom: custom };
+}
+/* 按样本对象取阈值（各告警判定统一走这里） */
+function thresholdForSample(sample){
+  const code = sample ? MotionCore.categoryCodes[sample.type] : '';
+  return thresholdForCategory(code);
+}
+/* 首次使用时把默认值落库，让「阈值设置」页显示的就是实际生效值 */
+function seedThresholds(){
+  if(!state.set.thresholds || typeof state.set.thresholds !== 'object') state.set.thresholds = {};
+  let changed = false;
+  // 一次性迁移：本版之前没有"按分组自定义"的功能，因此已存在的条目必然都是默认值，
+  // 补上 custom:false（否则会全部显示为"已自定义"）。仅执行一次。
+  if(!state.set.thresholdsSeeded){
+    Object.keys(state.set.thresholds).forEach(code => {
+      const entry = state.set.thresholds[code];
+      if(entry && typeof entry === 'object' && entry.custom === undefined){
+        entry.custom = false;
+        changed = true;
+      }
+    });
+    state.set.thresholdsSeeded = 1;
+    changed = true;
+  }
+  thresholdGroups().forEach(group => {
+    if(!group.code) return;
+    if(state.set.thresholds[group.code]) return;
+    const def = defaultThresholdFor(group.code);
+    state.set.thresholds[group.code] = { lo: def.lo, hi: def.hi, custom: false };
+    changed = true;
+  });
+  return changed;
+}
+function renderThresholds(){
+  const list = $('#thresholdList');
+  if(!list) return;
+  const groups = thresholdGroups();
+  list.innerHTML = groups.map(group => {
+    const t = thresholdForCategory(group.code);
+    const def = defaultThresholdFor(group.code);
+    return '<div class="threshold-row" data-code="' + esc(group.code) + '">'
+      + '<div class="threshold-name"><b>' + esc(group.name) + '</b>'
+      + '<small>默认 ' + def.lo + ' ~ ' + def.hi + ' ℃' + (t.custom ? ' · 已自定义' : '') + '</small></div>'
+      + '<label class="field threshold-input"><span>下限 ℃</span>'
+      + '<input class="input" type="number" inputmode="decimal" data-th="lo" value="' + t.lo + '"></label>'
+      + '<label class="field threshold-input"><span>上限 ℃</span>'
+      + '<input class="input" type="number" inputmode="decimal" data-th="hi" value="' + t.hi + '"></label>'
+      + '<button class="btn ghost mini" data-th-reset="' + esc(group.code) + '" title="恢复该分组默认值">恢复默认</button>'
+      + '</div>';
+  }).join('');
+  const pill = $('#thresholdPill');
+  if(pill) pill.textContent = groups.length + ' 个分组';
+  list.querySelectorAll('input[data-th]').forEach(input => {
+    input.addEventListener('change', () => saveGroupThreshold(input));
+  });
+  list.querySelectorAll('[data-th-reset]').forEach(btn => {
+    btn.addEventListener('click', () => resetGroupThreshold(btn.dataset.thReset));
+  });
+}
+function saveGroupThreshold(input){
+  const row = input.closest('.threshold-row');
+  if(!row) return;
+  const code = row.dataset.code;
+  const loEl = row.querySelector('input[data-th="lo"]');
+  const hiEl = row.querySelector('input[data-th="hi"]');
+  const lo = Number(loEl.value), hi = Number(hiEl.value);
+  if(loEl.value.trim() === '' || hiEl.value.trim() === '' || !Number.isFinite(lo) || !Number.isFinite(hi)){
+    toast('请输入有效温度'); renderThresholds(); return;
+  }
+  if(hi <= lo){ toast('上限必须高于下限'); renderThresholds(); return; }
+  state.set.thresholds = state.set.thresholds || {};
+  state.set.thresholds[code] = { lo: lo, hi: hi, custom: true };
+  if(saveAll()){ toast('已保存：' + (row.querySelector('.threshold-name b') || {}).textContent); renderThresholds(); refreshAlerts(); }
+}
+function resetGroupThreshold(code){
+  if(state.set.thresholds) delete state.set.thresholds[code];
+  if(saveAll()){ toast('已恢复默认'); renderThresholds(); refreshAlerts(); }
+}
+function resetAllThresholds(){
+  state.set.thresholds = {};
+  if(saveAll()){ toast('已全部恢复默认'); renderThresholds(); refreshAlerts(); }
+}
+/* 阈值变化后让已入库样本的告警状态立即按新阈值重算 */
+function refreshAlerts(){
+  Object.keys(state.s.samples || {}).forEach(id => {
+    const x = state.s.samples[id];
+    if(!x) return;
+    const t = x.lastTemp != null ? x.lastTemp : x.temp;
+    if(t == null){ return; }
+    const th = thresholdForSample(x);
+    x.alert = (t > th.hi || t < th.lo) ? 'bad' : ((t > th.hi - 2.5 || t < th.lo + 2.5) ? 'warn' : 'good');
+  });
+  recomputeStats(); refreshStats(); renderLibrary(); renderFeed();
+}
 function fillSettings(){
-  $('#setHi').value = state.set.hi;
-  $('#setLo').value = state.set.lo;
+  // 设置页已无阈值项；保留函数以兼容既有调用
 }
-function saveTemperatureLimit(key, input){
-  const value=Number(input.value);
-  if(input.value.trim()===''||!Number.isFinite(value)){fillSettings();toast('请输入有效温度');return;}
-  const hi=key==='hi'?value:Number(state.set.hi),lo=key==='lo'?value:Number(state.set.lo);
-  if(hi<=lo){fillSettings();toast('上限必须高于下限');return;}
-  state.set[key]=value;
-  if(saveAll())toast('已保存');
-}
-$('#setHi').addEventListener('change', e=>saveTemperatureLimit('hi',e.target));
-$('#setLo').addEventListener('change', e=>saveTemperatureLimit('lo',e.target));
+$('#thresholdResetAll') && $('#thresholdResetAll').addEventListener('click', ()=>{
+  confirmDialog('恢复全部默认阈值', '会清除所有分组的自定义阈值，恢复为各类别默认上下限。', resetAllThresholds);
+});
 $('#exportBtn').addEventListener('click', openExportModal);
 $('#importBtn').addEventListener('click', ()=> AndroidHost.importJson());
 $('#importFile').addEventListener('change', importData);
@@ -1771,8 +1883,8 @@ function updateTemperatureLive(d,format='串口'){
   if(channel){
     const smooth=emaSmooth(channelSmooth.get(d.channel),value,EMA_ALPHA);
     channelSmooth.set(d.channel,smooth);
-    const hi=channel.hi!=null?channel.hi:Number(state.set.hi);
-    const lo=channel.lo!=null?channel.lo:Number(state.set.lo);
+    const chTh=thresholdForCategory(channel.category);
+    const hi=chTh.hi, lo=chTh.lo;
     const bad=smooth>hi||smooth<lo;
     const warn=!bad&&(smooth>hi-2.5||smooth<lo+2.5);
     const valueNode=$('#temp'+d.channel),timeNode=$('#tempTime'+d.channel),card=$('#tempCard'+d.channel);
@@ -1960,8 +2072,8 @@ function updateSampleSensor(id, d){
   x.lastTemp=t!=null?t:x.lastTemp;
   x.lastUpdate = FMT.now();
   x.monitor = true;
-  const threshold=MotionCore.thresholdFor(MotionCore.categoryCodes[x.type]);
-  const hi=threshold?threshold.hi:Number(state.set.hi),lo=threshold?threshold.lo:Number(state.set.lo);
+  const th=thresholdForSample(x);
+  const hi=th.hi, lo=th.lo;
   let target='good';
   if(t != null){
     if(t>hi||t<lo)target='bad';
@@ -2146,6 +2258,8 @@ function init(){
   renderLibrary();
   renderRecords();
   fillSettings();
+  if(seedThresholds()) saveAll();
+  renderThresholds();
   renderFeed();
   renderTemperatureRanges();
   startHttpBridge();

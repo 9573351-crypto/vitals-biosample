@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vitals · 生息 — 生物样本动态管理库</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
-<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="styles.css?v=33"><link rel="stylesheet" href="android.css">
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="styles.css?v=34"><link rel="stylesheet" href="android.css">
 <script src="vendor/qrcode.min.js" defer></script>
 <script src="vendor/chart.umd.js" defer></script>
 <script src="motion.js" defer></script>
-<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=32" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="backup.js" defer></script><script src="updater.js" defer></script>
+<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=34" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="backup.js" defer></script><script src="updater.js" defer></script>
 </head>
 <body>
 
@@ -38,6 +38,9 @@
     </button>
     <button class="nav-item" data-view="records">
       <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1.4"/><circle cx="4" cy="12" r="1.4"/><circle cx="4" cy="18" r="1.4"/></svg></span><span class="nav-label">动态记录</span>
+    </button>
+    <button class="nav-item" data-view="thresholds">
+      <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 12h4M12 12h8M4 17h13"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18.5" cy="17" r="2"/></svg></span><span class="nav-label">阈值设置</span>
     </button>
   </nav>
 
@@ -230,12 +233,23 @@
       </div>
     </section>
 
+    <!-- 阈值设置（按样本分组分别配置温度报警上下限） -->
+    <section class="view" id="view-thresholds">
+      <div class="panel glass">
+        <div class="panel-head"><h3>温度报警阈值</h3><span class="pill" id="thresholdPill">按分组</span></div>
+        <p class="muted">分组与「样本库」一致：样本库里出现过的类别都会列在下面，可逐个设置上下限。超出上限或低于下限即报「异常」，接近边界 2.5℃ 内报「预警」。</p>
+        <div class="threshold-list" id="thresholdList"></div>
+        <div class="set-actions">
+          <button class="btn ghost" id="thresholdResetAll">全部恢复默认</button>
+        </div>
+      </div>
+    </section>
+
     <!-- 设置 -->
     <section class="view" id="view-settings">
       <div class="panel glass">
-        <div class="panel-head"><h3>偏好设置</h3></div>
-        <div class="setting-row"><label>采集温度报警阈值上限（℃）</label><input id="setHi" type="number" class="input"></div>
-        <div class="setting-row"><label>采集温度报警阈值下限（℃）</label><input id="setLo" type="number" class="input"></div>
+        <div class="panel-head"><h3>设置</h3></div>
+        <p class="muted">温度报警阈值已移到侧边栏的「阈值设置」，可按样本分组分别配置。</p>
       </div>
     </section>
   </div>

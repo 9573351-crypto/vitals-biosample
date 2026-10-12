@@ -789,3 +789,22 @@ img{display:block}
 .sp-item:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(10,105,255,0.25)}
 .sp-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sp-check{flex:none;font-size:13px;color:var(--blue)}
+
+/* ==================== 阈值设置（按样本分组） ==================== */
+.threshold-list{display:flex;flex-direction:column;gap:10px;margin:14px 0 4px}
+.threshold-row{
+  display:grid;grid-template-columns:minmax(180px,1.6fr) minmax(120px,1fr) minmax(120px,1fr) auto;
+  align-items:end;gap:12px;padding:12px 14px;border-radius:14px;
+  background:rgba(255,255,255,0.6);border:1px solid var(--border);
+}
+.threshold-name{display:flex;flex-direction:column;gap:2px;padding-bottom:6px;min-width:0}
+.threshold-name b{font-size:15px;font-weight:600}
+.threshold-name small{font-size:11.5px;color:var(--text-2)}
+.threshold-input{min-width:0}
+.threshold-input .input{width:100%;text-align:left}
+.threshold-row .btn.mini{min-height:var(--control-h);padding:0 14px}
+@media(max-width:900px){
+  .threshold-row{grid-template-columns:1fr 1fr;align-items:end}
+  .threshold-name{grid-column:1/-1;padding-bottom:0}
+  .threshold-row .btn.mini{grid-column:1/-1;justify-self:stretch}
+}
