@@ -9,7 +9,7 @@ const methods={
  getRecords:id=>read().records.filter(r=>!id||r.sampleId===id),getSettings:()=>read().settings,
  getSample:id=>read().samples[id]||null,getSampleByBarcode:code=>Object.values(read().samples).find(s=>s.code===code)||null,
  getBackup:()=>({app:'vitals-biosample',version:2,samples:read().samples,records:read().records,settings:read().settings}),
- exportBackup:()=>({app:'vitals-biosample',schemaVersion:4,appVersion:'1.21.8',samples:read().samples,records:read().records,settings:read().settings}),
+ exportBackup:()=>({app:'vitals-biosample',schemaVersion:4,appVersion:'1.21.9',samples:read().samples,records:read().records,settings:read().settings}),
  getBackupStatus:()=>({configured:false,lastSuccess:0}),
  commitChanges:json=>{
   if(window.failCommit){window.failCommit=false;throw Error('测试注入：磁盘写入失败');}

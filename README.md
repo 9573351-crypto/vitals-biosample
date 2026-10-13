@@ -4,7 +4,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 当前版本 | **1.21.8**（versionCode 44） |
+| 当前版本 | **1.21.9**（versionCode 45） |
 | 包名 | `com.vitals.android` |
 | 形态 | Android 应用（WebView + JS 桥 + SQLite），`web-preview/` 为浏览器预览版 |
 | 更新来源 | 本仓库的 GitHub Release |

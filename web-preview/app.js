@@ -4,7 +4,7 @@
 
 /* ==================== 构建指纹 ==================== */
 // 构建指纹：每次更新递增，用于核对界面实际加载的代码是否为新版（若非新版则说明入口缓存）
-const BUILD = 'v25-1009';
+const BUILD = 'v26-1013';
 
 /* ==================== 工具 ==================== */
 const $ = s => document.querySelector(s);
@@ -133,7 +133,7 @@ function goView(name){
   if(name==='records') renderRecords();
   if(name==='settings') fillSettings();
   if(name==='thresholds') renderThresholds();
-  if(name==='monitor'){ ensureMonitorRefresh(); ensureMonitorSel(); renderRack(); renderMonitorCharts(); }
+  if(name==='monitor'){ if(pruneTemperatureHistory())saveAll(); ensureTempRetentionCleanup(); ensureMonitorRefresh(); ensureMonitorSel(); renderRack(); renderMonitorCharts(); }
 }
 function switchLibraryPane(name){
   const selected=name==='inventory'?'inventory':'list';
@@ -1796,7 +1796,7 @@ function reloadUI(){
 function refreshBuildTag(){
   const bt = $('#buildTag');
   if(!bt) return;
-  const version = String((window.__VITALS && window.__VITALS.version) || 'v1.21.8').replace(/^v/i, '');
+  const version = String((window.__VITALS && window.__VITALS.version) || 'v1.21.9').replace(/^v/i, '');
   bt.textContent = `Android ${version} · 一体机内部自动备份`;
 }
 
@@ -2019,6 +2019,9 @@ function applySensorData(d){
   if(!['t','l'].some(k=>d[k]!=null))return;
   const channel=MotionCore.temperatureChannels[d.channel];
   if(channel){
+    // 通道历史不依赖样本在库状态，保证温控装置持续采集时可查完整近 7 天曲线。
+    appendTempPoint(tempChannelSeriesId(d.channel),d.t);
+    scheduleSensorSave();
     const targets=Object.values(state.s.samples).filter(x=>x.status!=='out'&&MotionCore.categoryCodes[x.type]===channel.category);
     targets.forEach(x=>{updateSampleSensor(x.id,d);appendTempPoint(x.id,d.t,x.alert==='warn'||x.alert==='bad');});
     renderRack();refreshStats();return;
@@ -2033,45 +2036,101 @@ function applySensorData(d){
 
 let sensorSaveTimer=null;
 function scheduleSensorSave(){if(!sensorSaveTimer)sensorSaveTimer=setTimeout(()=>{sensorSaveTimer=null;saveAll();},2000);}
-document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(sensorSaveTimer);sensorSaveTimer=null;saveAll();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(sensorSaveTimer);sensorSaveTimer=null;pruneTemperatureHistory();saveAll();}});
 
-/* ==================== 温度追溯：原始点 + 时间窗降采样 ==================== */
+/* ==================== 温度追溯：原始点 + 时间窗降采样 ====================
+   每个样本保留自己的温度轨迹；B1/B2/B3 同时单独保留，使温度板没有对应在库样本时也不会丢失历史。 */
 const TEMP_RAW_WINDOW_MS=30*60*1000;
 const TEMP_BUCKET_MS=60*1000;
-const TEMP_RETENTION_MS=7*24*60*60*1000;
+const TEMP_HISTORY_DAYS=7;
+const TEMP_RETENTION_MS=TEMP_HISTORY_DAYS*24*60*60*1000;
 const TEMP_RAW_MAX=4000;
-const TEMP_ABNORMAL_MAX=130000;
+const TEMP_RETENTION_CLEANUP_MS=5*60*1000;
+const tempSeriesRuntime=new Map();
+let tempRetentionCleanupTimer=null;
+function tempSeriesKey(id){return 'templog:'+id;}
+function tempChannelSeriesId(channel){return 'channel:'+channel;}
+function validTempPoint(point){return !!(point&&Number.isFinite(Number(point.ts))&&Number.isFinite(Number(point.t)));}
+function normalizedTempPoint(point){
+  return {ts:Number(point.ts),t:Number(point.t),n:Number.isFinite(Number(point.n))&&Number(point.n)>0?Math.floor(Number(point.n)):1,ab:point.ab?1:0};
+}
+function insertTempRaw(list,point){
+  if(!list.length||list[list.length-1].ts<=point.ts){list.push(point);return;}
+  let low=0,high=list.length;
+  while(low<high){const mid=(low+high)>>1;if(list[mid].ts<=point.ts)low=mid+1;else high=mid;}
+  list.splice(low,0,point);
+}
+function mergeTempBucket(list,point){
+  const minute=Math.floor(point.ts/TEMP_BUCKET_MS)*TEMP_BUCKET_MS;
+  const incoming={...point,ts:minute};
+  let low=0,high=list.length-1;
+  while(low<=high){
+    const mid=(low+high)>>1,current=list[mid];
+    if(current.ts===minute){
+      const currentN=Math.max(1,Number(current.n)||1),incomingN=Math.max(1,Number(incoming.n)||1);
+      current.t=(Number(current.t)*currentN+Number(incoming.t)*incomingN)/(currentN+incomingN);
+      current.n=currentN+incomingN;if(incoming.ab)current.ab=1;return;
+    }
+    if(current.ts<minute)low=mid+1;else high=mid-1;
+  }
+  list.splice(low,0,{ts:minute,t:incoming.t,n:Math.max(1,Number(incoming.n)||1),ab:incoming.ab?1:0});
+}
 function ensureTemp(id){
-  let series=state.set['templog:'+id];
-  if(!series){series={raw:[],agg:[]};state.set['templog:'+id]=series;}
+  const key=tempSeriesKey(id);
+  let series=state.set[key];
+  if(!series||typeof series!=='object'||Array.isArray(series)){series={raw:[],agg:[]};state.set[key]=series;}
+  if(!Array.isArray(series.raw))series.raw=[];
+  if(!Array.isArray(series.agg))series.agg=[];
   return series;
 }
-function rollTemp(id,now){
-  const series=ensureTemp(id),rawCut=now-TEMP_RAW_WINDOW_MS,retain=now-TEMP_RETENTION_MS;
-  let i=0;
-  while(i<series.raw.length&&series.raw[i].ts<rawCut){
-    const point=series.raw[i],minute=Math.floor(point.ts/TEMP_BUCKET_MS)*TEMP_BUCKET_MS;
-    const last=series.agg.length?series.agg[series.agg.length-1]:null;
-    if(last&&last.ts===minute&&typeof last.n==='number'){last.t=(last.t*last.n+point.t)/(last.n+1);last.n++;if(point.ab)last.ab=1;}
-    else series.agg.push({ts:minute,t:point.t,n:1,ab:point.ab?1:0});
-    i++;
+/* 持久化数据只在首次读入或对象被替换时归一化；连续采样走增量路径，避免每条数据重排整段七天历史。 */
+function normalizeTempSeries(id){
+  const key=tempSeriesKey(id),series=ensureTemp(id);
+  if(tempSeriesRuntime.get(key)===series)return {series,changed:false};
+  const agg=[];
+  (series.agg||[]).filter(validTempPoint).map(normalizedTempPoint).sort((a,b)=>a.ts-b.ts).forEach(point=>mergeTempBucket(agg,point));
+  const raw=(series.raw||[]).filter(validTempPoint).map(point=>({ts:Number(point.ts),t:Number(point.t),ab:point.ab?1:0})).sort((a,b)=>a.ts-b.ts);
+  series.agg=agg;series.raw=raw;tempSeriesRuntime.set(key,series);
+  return {series,changed:true};
+}
+/* 严格保留最近 7×24 小时：raw 先保留 30 分钟，较早点转为每分钟平均值；超出 raw 上限也会聚合，不丢采样。 */
+function rollTemp(id,now=Date.now()){
+  const normalized=normalizeTempSeries(id),series=normalized.series,rawCut=now-TEMP_RAW_WINDOW_MS,retain=now-TEMP_RETENTION_MS;
+  let changed=normalized.changed,move=0;
+  while(move<series.raw.length&&series.raw[move].ts<rawCut){
+    const point=series.raw[move++];if(point.ts>=retain)mergeTempBucket(series.agg,normalizedTempPoint(point));
   }
-  if(i>0)series.raw=series.raw.slice(i);
-  if(series.agg.some(point=>point.ts<retain&&!point.ab))series.agg=series.agg.filter(point=>point.ab||point.ts>=retain);
-  if(series.agg.length>TEMP_ABNORMAL_MAX)series.agg=series.agg.slice(-TEMP_ABNORMAL_MAX);
+  if(move){series.raw.splice(0,move);changed=true;}
+  let expired=0;while(expired<series.agg.length&&series.agg[expired].ts<retain)expired++;
+  if(expired){series.agg.splice(0,expired);changed=true;}
+  while(series.raw.length>TEMP_RAW_MAX){mergeTempBucket(series.agg,normalizedTempPoint(series.raw.shift()));changed=true;}
+  return changed;
+}
+function pruneTemperatureHistory(now=Date.now()){
+  let changed=false;
+  Object.keys(state.set||{}).filter(key=>key.startsWith('templog:')).forEach(key=>{changed=rollTemp(key.slice('templog:'.length),now)||changed;});
+  return changed;
+}
+function ensureTempRetentionCleanup(){
+  if(tempRetentionCleanupTimer)return;
+  tempRetentionCleanupTimer=setInterval(()=>{if(pruneTemperatureHistory())saveAll();},TEMP_RETENTION_CLEANUP_MS);
 }
 function appendTempPoint(id,temp,abnormal=false){
-  if(temp==null||!Number.isFinite(temp))return;
+  if(temp==null||!Number.isFinite(Number(temp)))return;
   const series=ensureTemp(id),now=Date.now();
-  series.raw.push({ts:now,t:temp,ab:abnormal?1:0});
-  if(series.raw.length>TEMP_RAW_MAX)series.raw=series.raw.slice(-TEMP_RAW_MAX);
+  insertTempRaw(series.raw,{ts:now,t:Number(temp),ab:abnormal?1:0});
   rollTemp(id,now);
-  if($('#view-monitor').classList.contains('active') && id === monitorSelId) renderMonitorCharts();
+  if($('#view-monitor').classList.contains('active') && (id===monitorSelId||String(id).startsWith('channel:')))renderMonitorCharts();
 }
 function tempSeriesPoints(id){
-  const series=state.set['templog:'+id];
-  if(!series)return [];
-  return (series.agg||[]).map(point=>({ts:point.ts,t:point.t})).concat((series.raw||[]).map(point=>({ts:point.ts,t:point.t})));
+  const key=tempSeriesKey(id);if(!state.set[key])return [];
+  const series=normalizeTempSeries(id).series,out=[];let a=0,b=0;
+  while(a<series.agg.length||b<series.raw.length){
+    const left=series.agg[a],right=series.raw[b];
+    if(!right||(left&&left.ts<=right.ts)){out.push({ts:left.ts,t:left.t});a++;}
+    else {out.push({ts:right.ts,t:right.t});b++;}
+  }
+  return out;
 }
 
 function updateSampleSensor(id, d){
@@ -2189,15 +2248,40 @@ window.pickSample = function(id){
 };
 
 /* ==================== 温度图表（监测页） ==================== */
-let tempChart=null;
-function temperatureDayWindow(now=Date.now()){
-  const startDate=new Date(now);
+let tempChart=null,tempHistoryChart=null;
+let tempHistoryChannel='B1',tempHistoryDate='';
+function localDateKey(value=Date.now()){
+  const date=value instanceof Date?new Date(value.getTime()):new Date(value);
+  if(Number.isNaN(date.getTime()))return '';
+  const pad=n=>String(n).padStart(2,'0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+}
+function localDateFromKey(value){
+  const match=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!match)return null;
+  const date=new Date(Number(match[1]),Number(match[2])-1,Number(match[3]));
+  return date.getFullYear()===Number(match[1])&&date.getMonth()===Number(match[2])-1&&date.getDate()===Number(match[3])?date:null;
+}
+function temperatureDayWindow(value=Date.now()){
+  const startDate=typeof value==='string'?localDateFromKey(value):new Date(value);
+  if(!startDate||Number.isNaN(startDate.getTime()))return temperatureDayWindow(Date.now());
   startDate.setHours(0,0,0,0);
   const start=startDate.getTime();
   return {start:start,end:start+24*60*60*1000};
 }
-function temperatureDayPoints(history,now=Date.now()){
-  const day=temperatureDayWindow(now);
+function temperatureHistoryBounds(now=Date.now()){
+  const end=new Date(now);end.setHours(0,0,0,0);
+  const start=new Date(end);start.setDate(start.getDate()-(TEMP_HISTORY_DAYS-1));
+  return {min:localDateKey(start),max:localDateKey(end)};
+}
+function clampTemperatureHistoryDate(value,now=Date.now()){
+  const bounds=temperatureHistoryBounds(now),date=localDateFromKey(value);
+  if(!date)return bounds.max;
+  const key=localDateKey(date);
+  return key<bounds.min?bounds.min:(key>bounds.max?bounds.max:key);
+}
+function temperatureDayPoints(history,value=Date.now()){
+  const day=temperatureDayWindow(value);
   return (history||[])
     .filter(point=>point&&Number.isFinite(Number(point.ts))&&Number.isFinite(Number(point.t))&&Number(point.ts)>=day.start&&Number(point.ts)<day.end)
     .map(point=>({x:(Number(point.ts)-day.start)/(60*60*1000),y:Number(point.t)}));
@@ -2206,26 +2290,55 @@ function temperatureHourLabel(value){
   const hour=Math.round(Number(value));
   return String(hour).padStart(2,'0')+':00';
 }
-function renderMonitorCharts(){
-  const ctx1 = $('#chartTemp');
-  if(!ctx1) return;
-  updateMonitorSelUI();
-  const x = state.s.samples[monitorSelId];
-  const hist = x ? tempSeriesPoints(x.id) : [];
-  const dayPoints = temperatureDayPoints(hist);
-  const temps = dayPoints.map(point=>point.y);
+function renderTemperatureLine(chart,canvas,points,title,color,fillColor){
+  const temps=points.map(point=>point.y).filter(v=>v!=null);
   // fill 到数据下界而非 y=0，避免全负数据（如 -80℃ 低温样本）填充整个图表
-  const tempFloor = Math.min(0, ...temps.filter(v=>v!=null));
-  const fillTo = v => ({ target: { value: v } });
-  if(tempChart){
-    tempChart.data.datasets[0].data = dayPoints;
-    tempChart.data.datasets[0].fill = fillTo(tempFloor);
-    tempChart.update('none');
-  } else {
-    tempChart = new Chart(ctx1, { type:'line', data:{datasets:[{data:dayPoints,borderColor:'#0a69ff',backgroundColor:'rgba(10,105,255,0.08)',fill:fillTo(tempFloor),tension:.4,pointRadius:0,borderWidth:2}]},
-      options:{responsive:true,aspectRatio:2.4,parsing:false,plugins:{legend:{display:false}},scales:{x:{type:'linear',display:true,min:0,max:24,bounds:'ticks',grid:{color:'rgba(0,0,0,0.04)'},ticks:{stepSize:4,autoSkip:false,maxRotation:0,font:{size:11},color:'#6e6e73',callback:temperatureHourLabel},title:{display:true,text:'今日 24 小时',color:'#86868b',font:{size:11,weight:'normal'}}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:11},color:'#6e6e73'}}}} });
+  const floor=Math.min(0,...temps),fill=({target:{value:floor}});
+  if(chart){
+    chart.data.datasets[0].data=points;chart.data.datasets[0].fill=fill;
+    chart.options.scales.x.title.text=title;chart.update('none');return chart;
   }
-
+  return new Chart(canvas,{type:'line',data:{datasets:[{data:points,borderColor:color,backgroundColor:fillColor,fill,tension:.4,pointRadius:0,borderWidth:2}]},
+    options:{responsive:true,aspectRatio:2.4,parsing:false,plugins:{legend:{display:false}},scales:{x:{type:'linear',display:true,min:0,max:24,bounds:'ticks',grid:{color:'rgba(0,0,0,0.04)'},ticks:{stepSize:4,autoSkip:false,maxRotation:0,font:{size:11},color:'#6e6e73',callback:temperatureHourLabel},title:{display:true,text:title,color:'#86868b',font:{size:11,weight:'normal'}}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:11},color:'#6e6e73'}}}}});
+}
+function refreshTemperatureHistoryControls(){
+  const channel=$('#tempHistoryChannel'),date=$('#tempHistoryDate'),bounds=temperatureHistoryBounds();
+  tempHistoryDate=clampTemperatureHistoryDate(tempHistoryDate||bounds.max);
+  if(channel){
+    if(!MotionCore.temperatureChannels[tempHistoryChannel])tempHistoryChannel='B1';
+    channel.value=tempHistoryChannel;
+  }
+  if(date){date.min=bounds.min;date.max=bounds.max;date.value=tempHistoryDate;}
+  return bounds;
+}
+function bindTemperatureHistoryControls(){
+  const channel=$('#tempHistoryChannel'),date=$('#tempHistoryDate'),today=$('#tempHistoryToday');
+  if(channel&&!channel.dataset.bound){channel.dataset.bound='1';channel.addEventListener('change',()=>{tempHistoryChannel=channel.value;renderTemperatureHistory();});}
+  if(date&&!date.dataset.bound){date.dataset.bound='1';date.addEventListener('change',()=>{tempHistoryDate=clampTemperatureHistoryDate(date.value);renderTemperatureHistory();});}
+  if(today&&!today.dataset.bound){today.dataset.bound='1';today.addEventListener('click',()=>{tempHistoryDate=temperatureHistoryBounds().max;renderTemperatureHistory();});}
+}
+function renderTemperatureHistory(){
+  const canvas=$('#chartTempHistory');
+  if(!canvas)return;
+  const bounds=refreshTemperatureHistoryControls();
+  const channel=MotionCore.temperatureChannels[tempHistoryChannel]||MotionCore.temperatureChannels.B1;
+  const history=tempSeriesPoints(tempChannelSeriesId(tempHistoryChannel));
+  const points=temperatureDayPoints(history,tempHistoryDate);
+  const dateText=tempHistoryDate===bounds.max?'今日':tempHistoryDate;
+  const channelText=`${tempHistoryChannel} · ${channel.type}`;
+  const summary=$('#tempHistorySummary'),empty=$('#tempHistoryEmpty');
+  if(summary)summary.textContent=`${dateText} 00:00–24:00 · ${channelText} · ${points.length?'共 '+points.length+' 个采样点':'暂无采样点'}`;
+  if(empty){empty.hidden=points.length>0;empty.textContent=`${dateText}暂无 ${channelText} 温度记录`;}
+  tempHistoryChart=renderTemperatureLine(tempHistoryChart,canvas,points,`${dateText} 24 小时 · ${tempHistoryChannel}`,'#5e5ce6','rgba(94,92,230,0.10)');
+}
+function renderMonitorCharts(){
+  const ctx1=$('#chartTemp');
+  if(ctx1){
+    updateMonitorSelUI();
+    const sample=state.s.samples[monitorSelId],points=temperatureDayPoints(sample?tempSeriesPoints(sample.id):[]);
+    tempChart=renderTemperatureLine(tempChart,ctx1,points,'今日 24 小时','#0a69ff','rgba(10,105,255,0.08)');
+  }
+  renderTemperatureHistory();
 }
 
 /* ==================== 后台实时刷新监测图表 ==================== */
@@ -2289,6 +2402,10 @@ function init(){
   renderThresholds();
   renderFeed();
   renderTemperatureRanges();
+  bindTemperatureHistoryControls();
+  // 即使温度板暂时没有新数据，重新打开应用也会清掉超过 7 天的旧采样。
+  if(pruneTemperatureHistory())saveAll();
+  ensureTempRetentionCleanup();
   startHttpBridge();
   refreshBuildTag();
   // 定期刷新概览图表

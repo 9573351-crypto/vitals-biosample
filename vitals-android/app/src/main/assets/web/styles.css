@@ -167,6 +167,17 @@ img{display:block}
 .text-btn{font-size:13px;font-weight:600;color:var(--blue)}
 .text-btn:hover{text-decoration:underline}
 
+/* ===== 温度历史 ===== */
+.temperature-history-panel{margin-top:16px}
+.temperature-history-panel .panel-head{align-items:flex-start}
+.temperature-history-panel .panel-head .muted{margin-top:3px;font-size:12px;color:var(--text-2)}
+.temp-history-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:10px}
+.temp-history-controls .field{min-width:164px;flex:0 1 210px}
+.temp-history-controls .input,.temp-history-controls .select{width:100%}
+.temp-history-controls .btn{min-height:var(--control-h);align-self:flex-end}
+.temp-history-summary,.temp-history-empty{min-height:20px;margin:2px 0 10px;font-size:12px;color:var(--text-2)}
+.temp-history-empty{color:var(--text-3)}
+
 .empty{text-align:center;color:var(--text-3);padding:28px 0;font-size:14px}
 
 /* ===== 动态流 ===== */
@@ -807,4 +818,9 @@ img{display:block}
   .threshold-row{grid-template-columns:1fr 1fr;align-items:end}
   .threshold-name{grid-column:1/-1;padding-bottom:0}
   .threshold-row .btn.mini{grid-column:1/-1;justify-self:stretch}
+}
+@media(max-width:600px){
+  .temp-history-controls{display:grid;grid-template-columns:1fr 1fr}
+  .temp-history-controls .field{min-width:0;flex:none}
+  .temp-history-controls .btn{grid-column:1/-1;width:100%}
 }

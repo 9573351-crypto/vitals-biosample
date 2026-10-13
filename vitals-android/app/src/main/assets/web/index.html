@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vitals · 生息 — 生物样本动态管理库</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
-<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="styles.css?v=44"><link rel="stylesheet" href="android.css">
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="styles.css?v=45"><link rel="stylesheet" href="android.css">
 <script src="vendor/qrcode.min.js" defer></script>
 <script src="vendor/chart.umd.js" defer></script>
 <script src="motion.js" defer></script>
-<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=44" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="backup.js" defer></script><script src="updater.js" defer></script>
+<script src="motion-core.js" defer></script><script src="persistence.js" defer></script><script src="app.js?v=45" defer></script><script src="android.js" defer></script><script src="scanner.js" defer></script><script src="printer.js" defer></script><script src="backup.js" defer></script><script src="updater.js" defer></script>
 </head>
 <body>
 
@@ -212,6 +212,20 @@
       <div>
         <div class="panel glass"><div class="panel-head"><h3>温度 ℃ · 今日 00:00–24:00 <span class="pill mon-sel" id="monSelPill">未选择</span></h3></div><canvas id="chartTemp"></canvas></div>
       </div>
+      <div class="panel glass temperature-history-panel">
+        <div class="panel-head">
+          <div><h3>历史温度</h3><p class="muted">按温度通道查阅；仅保存最近 7 天</p></div>
+          <span class="pill">近 7 天</span>
+        </div>
+        <div class="temp-history-controls">
+          <label class="field"><span>温度通道</span><select class="select" id="tempHistoryChannel" aria-label="历史温度通道"><option value="B1">B1 · 全血</option><option value="B2">B2 · 血清</option><option value="B3">B3 · 血浆</option></select></label>
+          <label class="field"><span>查阅日期</span><input class="input" type="date" id="tempHistoryDate" aria-label="历史温度日期"></label>
+          <button type="button" class="btn ghost" id="tempHistoryToday">回到今日</button>
+        </div>
+        <p class="temp-history-summary" id="tempHistorySummary" aria-live="polite"></p>
+        <p class="temp-history-empty" id="tempHistoryEmpty" aria-live="polite" hidden>暂无温度记录</p>
+        <canvas id="chartTempHistory"></canvas>
+      </div>
     </section>
 
     <!-- 动态记录 -->
@@ -403,7 +417,7 @@
 </div>
 <script>
 // 注入构建版本标记（用于排错缓存）
-window.__VITALS = { version: 'v1.21.8', build: Date.now() };
+window.__VITALS = { version: 'v1.21.9', build: Date.now() };
 </script>
 </body>
 </html>
